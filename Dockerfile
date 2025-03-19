@@ -50,6 +50,12 @@ RUN mkdir bublik
 COPY ./bublik/requirements.txt /app/bublik/requirements.txt
 RUN uv pip install --system --no-cache-dir -r /app/bublik/requirements.txt
 
+COPY ./entrypoint-common.sh /app/bublik/entrypoint-common.sh
+COPY ./entrypoint-django.sh /app/bublik/entrypoint-django.sh
+COPY ./entrypoint-celery.sh /app/bublik/entrypoint-celery.sh
+COPY ./entrypoint-logserver.sh /app/bublik/entrypoint-logserver.sh
+RUN chmod +x /app/bublik/entrypoint-*.sh
+
 WORKDIR /app/te
 COPY ./test-environment .
 RUN ./dispatcher.sh -q --conf-builder=builder.conf.tools --no-run
@@ -87,9 +93,8 @@ WORKDIR /app
 COPY --from=docs-builder /app/build /app/bublik/docs
 
 COPY ./bublik ./bublik
-COPY ../entrypoint.sh ./bublik/entrypoint.sh
 
-RUN mkdir -p ./bublik/logs && chmod +x ./bublik/entrypoint.sh
+RUN mkdir -p ./bublik/logs
 
 WORKDIR /app/bublik
 
@@ -99,70 +104,49 @@ WORKDIR /app/bublik
 FROM base AS log-server
 
 RUN apt-get update && apt-get install -y \
-  apache2 \
-  file \
-  jq \
-  && rm -rf /var/lib/apt/lists/*
+    apache2 \
+    file \
+    jq \
+    && rm -rf /var/lib/apt/lists/*
 
-# Enable CGI module
 RUN a2enmod cgid
 
-# Create necessary directories and set proper permissions
+# Create necessary directories
 RUN mkdir -p \
-  /home/te-logs/cgi-bin \
-  /home/te-logs/logs \
-  /home/te-logs/incoming \
-  /home/te-logs/bad \
-  && chown -R www-data:www-data /home/te-logs \
-  && chmod -R 755 /home/te-logs
+    /home/te-logs/cgi-bin \
+    /home/te-logs/logs \
+    /home/te-logs/incoming \
+    /home/te-logs/bad \
+    /app/bublik
 
-# Copy CGI scripts and templates
+# Copy entrypoint scripts
+COPY ./entrypoint-common.sh /app/bublik/entrypoint-common.sh
+COPY ./entrypoint-logserver.sh /app/bublik/entrypoint-logserver.sh
+RUN chmod +x /app/bublik/entrypoint-*.sh
+
 COPY ./test-environment/tools/log_server/te-logs-error404.template /home/te-logs/cgi-bin/te-logs-error404
 COPY ./test-environment/tools/log_server/te-logs-index.template /home/te-logs/cgi-bin/te-logs-index
 COPY ./test-environment/tools/log_server/publish-logs-unpack.sh /home/te-logs/bin/
 COPY ./test-environment/tools/log_server/publish-incoming-logs.template /home/te-logs/bin/publish-incoming-logs
 
-# Replace placeholders in CGI scripts and publish-incoming-logs
-RUN sed -i \
-  -e "s,@@TE_INSTALL@@,/app/te/build/inst,g" \
-  -e "s,/srv/logs,/home/te-logs/logs,g" \
-  -e "s,root_dir=\"/srv/logs\",root_dir=\"/home/te-logs/logs\",g" \
-  -e "s,@@BUBLIK_URL@@,http://django:8000,g" \
-  -e "s,@@LOGS_URL@@,http://te-log-server/logs,g" \
-  -e "s,@@LOGS_DIR@@,/home/te-logs/logs,g" \
-  -e "s,@@LOGS_INCOMING@@,/home/te-logs/incoming,g" \
-  -e "s,@@LOGS_BAD@@,/home/te-logs/bad,g" \
-  /home/te-logs/cgi-bin/te-logs-index \
-  /home/te-logs/cgi-bin/te-logs-error404 \
-  /app/te/build/inst/default/bin/te-logs-error404.sh \
-  /app/te/build/inst/default/bin/te-logs-index.sh \
-  /home/te-logs/bin/publish-incoming-logs
-
 RUN chmod 750 /home/te-logs/cgi-bin/* /home/te-logs/bin/* \
-  && echo "ServerName localhost" >> /etc/apache2/apache2.conf \
-  && chown -R www-data:www-data /home/te-logs \
-  && chmod -R 755 /home/te-logs/logs
+    && echo "ServerName localhost" >> /etc/apache2/apache2.conf \
+    && chmod -R 775 /home/te-logs/logs
 
 COPY ./test-environment/tools/log_server/apache2-te-log-server.conf.template /etc/apache2/conf-available/te-logs.conf
-
-RUN sed -i \
-  -e "s,@@LOGS_CGI_BIN@@,/home/te-logs/cgi-bin,g" \
-  -e "s,@@LOGS_DIR@@,/home/te-logs/logs,g" \
-  -e "s,@@LOGS_URL_PATH@@,/logs,g" \
-  /etc/apache2/conf-available/te-logs.conf
 
 RUN a2enconf te-logs
 
 # Configure Apache to log to stdout/stderr
 RUN ln -sf /proc/self/fd/1 /var/log/apache2/access.log && \
-  ln -sf /proc/self/fd/2 /var/log/apache2/error.log
+    ln -sf /proc/self/fd/2 /var/log/apache2/error.log
 
 # Update Apache configuration to use combined log format
 RUN sed -i \
-  -e 's|ErrorLog ${APACHE_LOG_DIR}/error.log|ErrorLog /proc/self/fd/2|' \
-  -e 's|CustomLog ${APACHE_LOG_DIR}/access.log combined|CustomLog /proc/self/fd/1 combined|' \
-  /etc/apache2/apache2.conf
+    -e 's|ErrorLog ${APACHE_LOG_DIR}/error.log|ErrorLog /proc/self/fd/2|' \
+    -e 's|CustomLog ${APACHE_LOG_DIR}/access.log combined|CustomLog /proc/self/fd/1 combined|' \
+    /etc/apache2/apache2.conf
 
 EXPOSE 80
 
-CMD ["apache2ctl", "-D", "FOREGROUND"]
+ENTRYPOINT ["/app/bublik/entrypoint-logserver.sh"]
