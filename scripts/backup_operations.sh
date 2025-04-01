@@ -1,5 +1,10 @@
 #!/bin/bash
 
+get_container_name() {
+  local service="$1"
+  docker ps --format '{{.Names}}' | grep "${COMPOSE_PROJECT_NAME}-${service}"
+}
+
 # Check required environment variables
 if [ -z "$DB_USER" ] || [ -z "$DB_NAME" ] || [ -z "$BUBLIK_DOCKER_DATA_DIR" ]; then
   echo "❌ Required environment variables not set"
@@ -7,8 +12,18 @@ if [ -z "$DB_USER" ] || [ -z "$DB_NAME" ] || [ -z "$BUBLIK_DOCKER_DATA_DIR" ]; t
   exit 1
 fi
 
+COMPOSE_PROJECT_NAME=${COMPOSE_PROJECT_NAME:-bublik}
+POSTGRES_CONTAINER=$(get_container_name "db")
+TE_LOG_CONTAINER=$(get_container_name "te-log-server")
+
 create_backup() {
   local backup_dir="${1:-backups}"
+
+  if [ -z "$POSTGRES_CONTAINER" ] || [ -z "$TE_LOG_CONTAINER" ]; then
+    echo "❌ Required containers not found"
+    echo "Make sure the application is running"
+    exit 1
+  fi
 
   # Ensure backup directory exists
   mkdir -p "$backup_dir"
@@ -27,7 +42,7 @@ create_backup() {
 
   # Backup database
   echo "📝 Creating database backup..."
-  if docker exec postgres pg_dump \
+  if docker exec $POSTGRES_CONTAINER pg_dump \
     -U "$DB_USER" \
     -d "$DB_NAME" \
     --clean \
@@ -44,7 +59,7 @@ create_backup() {
 
   # Backup TE logs
   echo "📝 Creating TE logs backup..."
-  if docker cp te-log-server:/home/te-logs/logs/. "$BACKUP_TMP_DIR/logs/"; then
+  if docker cp $TE_LOG_CONTAINER:/home/te-logs/logs/. "$BACKUP_TMP_DIR/logs/"; then
     echo "✅ TE logs backup created"
   else
     echo "❌ Failed to copy logs from container"
@@ -70,6 +85,12 @@ create_backup() {
 
 restore_backup() {
   local backup_file="$1"
+
+  if [ -z "$POSTGRES_CONTAINER" ] || [ -z "$TE_LOG_CONTAINER" ]; then
+    echo "❌ Required containers not found"
+    echo "Make sure the application is running"
+    exit 1
+  fi
 
   if [ -z "$backup_file" ]; then
     echo "❌ No backup file specified"
@@ -106,7 +127,7 @@ restore_backup() {
     # Restore database
     echo "🔄 Restoring database..."
     if [ -f "$BACKUP_DIR/db/database.sql" ]; then
-      if cat "$BACKUP_DIR/db/database.sql" | docker exec -i postgres psql \
+      if cat "$BACKUP_DIR/db/database.sql" | docker exec -i $POSTGRES_CONTAINER psql \
         -U "$DB_USER" \
         -d "$DB_NAME"; then
         echo "✅ Database restored successfully"
@@ -124,16 +145,16 @@ restore_backup() {
     # Restore TE logs
     echo "🔄 Restoring TE logs..."
     if [ -d "$BACKUP_DIR/logs" ]; then
-      if docker cp "$BACKUP_DIR/logs/." te-log-server:/home/te-logs/logs/; then
+      if docker cp "$BACKUP_DIR/logs/." $TE_LOG_CONTAINER:/home/te-logs/logs/; then
         echo "🔧 Fixing permissions..."
         # Get host user's UID/GID from environment
         HOST_UID=$(id -u)
         HOST_GID=$(id -g)
-        
+
         # Set ownership and permissions inside container
-        docker exec te-log-server chown -R ${HOST_UID}:${HOST_GID} /home/te-logs/logs/
-        docker exec te-log-server chmod -R 2775 /home/te-logs/logs/
-        
+        docker exec $TE_LOG_CONTAINER chown -R ${HOST_UID}:${HOST_GID} /home/te-logs/logs/
+        docker exec $TE_LOG_CONTAINER chmod -R 2775 /home/te-logs/logs/
+
         # Set permissions on host side as well
         if [ "$EUID" -ne 0 ]; then
           sudo chown -R ${HOST_UID}:${HOST_GID} "${BUBLIK_DOCKER_DATA_DIR}/te-logs/logs"
@@ -142,7 +163,7 @@ restore_backup() {
           chown -R ${HOST_UID}:${HOST_GID} "${BUBLIK_DOCKER_DATA_DIR}/te-logs/logs"
           chmod -R 2775 "${BUBLIK_DOCKER_DATA_DIR}/te-logs/logs"
         fi
-        
+
         echo "✅ TE logs restored successfully with correct permissions"
       else
         echo "❌ Failed to restore TE logs"
@@ -201,4 +222,4 @@ case "$1" in
     echo "  list [dir]       List available backups (default dir: backups)"
     exit 1
     ;;
-esac 
+esac

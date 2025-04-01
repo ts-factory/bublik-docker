@@ -28,4 +28,5 @@ echo "📝 Copying $FILENAME to $TARGET_DIR..."
 cp "$FILE" "$TARGET_DIR/"
 
 echo "🔄 Processing logs..."
-docker exec -it "${COMPOSE_PROJECT_NAME}-te-log-server" /bin/bash -c "/home/te-logs/bin/publish-incoming-logs"
+CONTAINER_NAME=$(docker ps --format '{{.Names}}' | grep "${COMPOSE_PROJECT_NAME}-te-log-server")
+docker exec -it "${CONTAINER_NAME}" /bin/bash -c "/home/te-logs/bin/publish-incoming-logs"
