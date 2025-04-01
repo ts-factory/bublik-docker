@@ -2,6 +2,7 @@ services:
   django:
     network_mode: host
     image: ${DOCKER_REGISTRY:-ghcr.io}/${DOCKER_ORG:-ts-factory}/${RUNNER_IMAGE_NAME:-bublik-runner}:${IMAGE_TAG:-latest}
+    restart: unless-stopped
     command: >
       gunicorn bublik.wsgi:application
       --bind ${BUBLIK_DOCKER_DJANGO_HOST}:${BUBLIK_DOCKER_DJANGO_PORT}
@@ -81,6 +82,7 @@ services:
 
   db:
     image: postgres
+    restart: unless-stopped
     environment:
       POSTGRES_DB: ${DB_NAME}
       POSTGRES_USER: ${DB_USER}
@@ -98,6 +100,7 @@ services:
 
   redis:
     image: redis
+    restart: unless-stopped
     volumes:
       - redis_data:/data
     expose:
@@ -109,6 +112,7 @@ services:
     image: rabbitmq:3-management
     ports:
       - ${RABBITMQ_PORT}:5672
+    restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "rabbitmqctl status || exit 1"]
       interval: 30s
@@ -119,6 +123,7 @@ services:
   celery:
     image: ${DOCKER_REGISTRY:-ghcr.io}/${DOCKER_ORG:-ts-factory}/${RUNNER_IMAGE_NAME:-bublik-runner}:${IMAGE_TAG:-latest}
     command: celery -A ${CELERY_APP} worker --max-tasks-per-child ${CELERYD_MAX_TASKS_PER_CHILD} --concurrency 1 -l ${CELERY_LOG_LEVEL}
+    restart: unless-stopped
     environment:
       - BUBLIK_DOCKER_PROXY_PORT=${BUBLIK_DOCKER_PROXY_PORT}
       - PER_CONF_DIR=${PER_CONF_DIR}
@@ -178,6 +183,7 @@ services:
     image: ${DOCKER_REGISTRY:-ghcr.io}/${DOCKER_ORG:-ts-factory}/${RUNNER_IMAGE_NAME:-bublik-runner}:${IMAGE_TAG:-latest}
     network_mode: host
     command: celery -A ${CELERY_APP} flower --persistent=${FLOWER_PERSISTENT} --url_prefix=${FLOWER_URL_PREFIX} --port=${FLOWER_PORT}
+    restart: unless-stopped
     environment:
       - BUBLIK_DOCKER_PROXY_PORT=${BUBLIK_DOCKER_PROXY_PORT}
       - PER_CONF_DIR=${PER_CONF_DIR}
@@ -257,6 +263,7 @@ services:
 
   nginx:
     image: ${DOCKER_REGISTRY:-ghcr.io}/${DOCKER_ORG:-ts-factory}/${NGINX_IMAGE_NAME:-bublik-nginx}:${IMAGE_TAG:-latest}
+    restart: unless-stopped
     environment:
       - NGINX_ENVSUBST_OUTPUT_DIR=/etc/nginx/conf.d
       - URL_PREFIX=${URL_PREFIX}
