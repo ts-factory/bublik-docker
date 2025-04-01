@@ -79,6 +79,7 @@ WORKDIR /app
 
 COPY ./bublik-release/package.json ./bublik-release/pnpm-lock.yaml ./
 
+RUN pnpm config set registry https://registry.npmjs.org
 RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --frozen-lockfile
 
 COPY ./bublik-release .
