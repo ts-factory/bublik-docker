@@ -1,0 +1,193 @@
+name: Build and Push Docker Images
+
+on:
+  push:
+    tags: [ 'v*' ]
+
+concurrency:
+  group: "release"
+  cancel-in-progress: true
+
+env:
+  REGISTRY: ghcr.io
+  DOCKER_ORG: ${{ github.repository_owner }}
+  RUNNER_IMAGE_NAME: bublik-runner
+  NGINX_IMAGE_NAME: bublik-nginx
+  LOG_SERVER_IMAGE_NAME: bublik-log-server
+  # Add your URL prefix here if you host with base url
+  URL_PREFIX: ""
+
+jobs:
+  build:
+    runs-on: ${{ matrix.runner }}
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: linux/amd64
+            runner: ubuntu-24.04
+          - platform: linux/arm64
+            runner: ubuntu-24.04-arm
+    steps:
+      - name: Prepare
+        run: |
+          platform=${{ matrix.platform }}
+          echo "PLATFORM_PAIR=${platform//\//-}" >> $GITHUB_ENV
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: true
+          fetch-depth: 0
+
+      - name: Copy settings.py
+        run: |
+          chmod +x scripts/setup_settings.sh
+          ./scripts/setup_settings.sh
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to the Container registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Docker meta
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: |
+            ${{ env.REGISTRY }}/${{ env.DOCKER_ORG }}/${{ env.RUNNER_IMAGE_NAME }}
+            ${{ env.REGISTRY }}/${{ env.DOCKER_ORG }}/${{ env.LOG_SERVER_IMAGE_NAME }}
+            ${{ env.REGISTRY }}/${{ env.DOCKER_ORG }}/${{ env.NGINX_IMAGE_NAME }}
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=raw,value=latest
+
+      - name: Build and push Runner image
+        id: build_runner
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          target: runner
+          platforms: ${{ matrix.platform }}
+          build-args: |
+            URL_PREFIX=${{ env.URL_PREFIX }}
+          push: true
+          labels: ${{ steps.meta.outputs.labels }}
+          outputs: type=image,push-by-digest=true,name-canonical=true,push=true
+          tags: ${{ env.REGISTRY }}/${{ env.DOCKER_ORG }}/${{ env.RUNNER_IMAGE_NAME }}
+
+      - name: Build and push Log Server image
+        id: build_logserver
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          target: log-server
+          platforms: ${{ matrix.platform }}
+          build-args: |
+            URL_PREFIX=${{ env.URL_PREFIX }}
+          push: true
+          labels: ${{ steps.meta.outputs.labels }}
+          outputs: type=image,push-by-digest=true,name-canonical=true,push=true
+          tags: ${{ env.REGISTRY }}/${{ env.DOCKER_ORG }}/${{ env.LOG_SERVER_IMAGE_NAME }}
+
+      - name: Build and push Nginx image
+        id: build_nginx
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./nginx/Dockerfile
+          platforms: ${{ matrix.platform }}
+          build-args: |
+            URL_PREFIX=${{ env.URL_PREFIX }}
+          push: true
+          labels: ${{ steps.meta.outputs.labels }}
+          outputs: type=image,push-by-digest=true,name-canonical=true,push=true
+          tags: ${{ env.REGISTRY }}/${{ env.DOCKER_ORG }}/${{ env.NGINX_IMAGE_NAME }}
+
+      - name: Export digests
+        run: |
+          mkdir -p ${{ runner.temp }}/digests
+          echo "${{ steps.build_runner.outputs.digest }}" > "${{ runner.temp }}/digests/runner_$(echo "${{ steps.build_runner.outputs.digest }}" | cut -d':' -f2)"
+          echo "${{ steps.build_logserver.outputs.digest }}" > "${{ runner.temp }}/digests/logserver_$(echo "${{ steps.build_logserver.outputs.digest }}" | cut -d':' -f2)"
+          echo "${{ steps.build_nginx.outputs.digest }}" > "${{ runner.temp }}/digests/nginx_$(echo "${{ steps.build_nginx.outputs.digest }}" | cut -d':' -f2)"
+
+      - name: Upload digests
+        uses: actions/upload-artifact@v4
+        with:
+          name: digests-${{ env.PLATFORM_PAIR }}
+          path: ${{ runner.temp }}/digests/*
+          if-no-files-found: error
+          retention-days: 1
+
+  merge:
+    runs-on: ubuntu-latest
+    needs:
+      - build
+    steps:
+      - name: Download digests
+        uses: actions/download-artifact@v4
+        with:
+          path: ${{ runner.temp }}/digests
+          pattern: digests-*
+          merge-multiple: true
+
+      - name: Log in to the Container registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Docker meta
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: |
+            ${{ env.REGISTRY }}/${{ env.DOCKER_ORG }}/${{ env.RUNNER_IMAGE_NAME }}
+            ${{ env.REGISTRY }}/${{ env.DOCKER_ORG }}/${{ env.LOG_SERVER_IMAGE_NAME }}
+            ${{ env.REGISTRY }}/${{ env.DOCKER_ORG }}/${{ env.NGINX_IMAGE_NAME }}
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=raw,value=latest
+
+      - name: Create and push manifest lists
+        run: |
+          # Runner
+          docker buildx imagetools create -t ${{ env.REGISTRY }}/${{ env.DOCKER_ORG }}/${{ env.RUNNER_IMAGE_NAME }}:${{ env.DOCKER_METADATA_OUTPUT_VERSION }} \
+            -t ${{ env.REGISTRY }}/${{ env.DOCKER_ORG }}/${{ env.RUNNER_IMAGE_NAME }}:$(echo ${{ env.DOCKER_METADATA_OUTPUT_VERSION }} | cut -d'.' -f1,2) \
+            -t ${{ env.REGISTRY }}/${{ env.DOCKER_ORG }}/${{ env.RUNNER_IMAGE_NAME }}:latest \
+            $(cat ${{ runner.temp }}/digests/runner_* | sed "s|^|${{ env.REGISTRY }}/${{ env.DOCKER_ORG }}/${{ env.RUNNER_IMAGE_NAME }}@|")
+
+          # Log Server
+          docker buildx imagetools create -t ${{ env.REGISTRY }}/${{ env.DOCKER_ORG }}/${{ env.LOG_SERVER_IMAGE_NAME }}:${{ env.DOCKER_METADATA_OUTPUT_VERSION }} \
+            -t ${{ env.REGISTRY }}/${{ env.DOCKER_ORG }}/${{ env.LOG_SERVER_IMAGE_NAME }}:$(echo ${{ env.DOCKER_METADATA_OUTPUT_VERSION }} | cut -d'.' -f1,2) \
+            -t ${{ env.REGISTRY }}/${{ env.DOCKER_ORG }}/${{ env.LOG_SERVER_IMAGE_NAME }}:latest \
+            $(cat ${{ runner.temp }}/digests/logserver_* | sed "s|^|${{ env.REGISTRY }}/${{ env.DOCKER_ORG }}/${{ env.LOG_SERVER_IMAGE_NAME }}@|")
+
+          # Nginx
+          docker buildx imagetools create -t ${{ env.REGISTRY }}/${{ env.DOCKER_ORG }}/${{ env.NGINX_IMAGE_NAME }}:${{ env.DOCKER_METADATA_OUTPUT_VERSION }} \
+            -t ${{ env.REGISTRY }}/${{ env.DOCKER_ORG }}/${{ env.NGINX_IMAGE_NAME }}:$(echo ${{ env.DOCKER_METADATA_OUTPUT_VERSION }} | cut -d'.' -f1,2) \
+            -t ${{ env.REGISTRY }}/${{ env.DOCKER_ORG }}/${{ env.NGINX_IMAGE_NAME }}:latest \
+            $(cat ${{ runner.temp }}/digests/nginx_* | sed "s|^|${{ env.REGISTRY }}/${{ env.DOCKER_ORG }}/${{ env.NGINX_IMAGE_NAME }}@|")
+
+      - name: Inspect images
+        run: |
+          docker buildx imagetools inspect ${{ env.REGISTRY }}/${{ env.DOCKER_ORG }}/${{ env.RUNNER_IMAGE_NAME }}:${{ steps.meta.outputs.version }}
+          docker buildx imagetools inspect ${{ env.REGISTRY }}/${{ env.DOCKER_ORG }}/${{ env.LOG_SERVER_IMAGE_NAME }}:${{ steps.meta.outputs.version }}
+          docker buildx imagetools inspect ${{ env.REGISTRY }}/${{ env.DOCKER_ORG }}/${{ env.NGINX_IMAGE_NAME }}:${{ steps.meta.outputs.version }}
