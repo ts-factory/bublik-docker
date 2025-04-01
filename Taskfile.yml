@@ -165,8 +165,14 @@ tasks:
     aliases: [up]
     silent: true
     cmds:
-      - docker compose -f docker-compose.yml up --build -d
+      - docker compose -f docker-compose.yml up --force-recreate -d
       - echo "🚀 Production environment started at {{.API_URL}}"
+
+  docker:pull:
+    desc: Pull Docker images
+    aliases: [pull]
+    cmds:
+      - docker compose -f docker-compose.yml pull
 
   docker:dev:stop:
     desc: Stop Docker development environment
@@ -428,3 +434,61 @@ tasks:
       Default directory: ./backups/
     cmds:
       - ./scripts/backup_operations.sh list {{.BACKUP_DIR}}
+
+  ###########################################
+  #         Docker Images                   #
+  ###########################################
+  docker:build-images:
+    desc: Build Docker images
+    summary: Build Runner, Log Server, and Nginx images
+    aliases: [build]
+    silent: true
+    cmds:
+      - task: docker:build:runner
+      - task: docker:build:log-server
+      - task: docker:build:nginx
+
+  docker:build:runner:
+    desc: Build Runner image
+    internal: true
+    cmds:
+      - >
+        docker build
+        --target runner
+        --build-arg URL_PREFIX={{.URL_PREFIX}}
+        --build-arg DOCS_URL={{.DOCS_URL}}
+        -t {{.DOCKER_REGISTRY}}/{{.DOCKER_ORG}}/{{.RUNNER_IMAGE_NAME}}:{{.IMAGE_TAG}}
+        .
+
+  docker:build:log-server:
+    desc: Build Log Server image
+    internal: true
+    cmds:
+      - >
+        docker build
+        --target log-server
+        --build-arg URL_PREFIX={{.URL_PREFIX}}
+        --build-arg DOCS_URL={{.DOCS_URL}}
+        -t {{.DOCKER_REGISTRY}}/{{.DOCKER_ORG}}/{{.LOG_SERVER_IMAGE_NAME}}:{{.IMAGE_TAG}}
+        .
+
+  docker:build:nginx:
+    desc: Build Nginx image
+    internal: true
+    cmds:
+      - >
+        docker build
+        --build-arg URL_PREFIX={{.URL_PREFIX}}
+        --build-arg DOCS_URL={{.DOCS_URL}}
+        -t {{.DOCKER_REGISTRY}}/{{.DOCKER_ORG}}/{{.NGINX_IMAGE_NAME}}:{{.IMAGE_TAG}}
+        -f ./nginx/Dockerfile
+        .
+
+  docker:push-images:
+    desc: Push Docker images to registry
+    summary: Push Runner, Log Server, and Nginx images to container registry
+    aliases: [push]
+    cmds:
+      - docker push {{.DOCKER_REGISTRY}}/{{.DOCKER_ORG}}/{{.RUNNER_IMAGE_NAME}}:{{.IMAGE_TAG}}
+      - docker push {{.DOCKER_REGISTRY}}/{{.DOCKER_ORG}}/{{.LOG_SERVER_IMAGE_NAME}}:{{.IMAGE_TAG}}
+      - docker push {{.DOCKER_REGISTRY}}/{{.DOCKER_ORG}}/{{.NGINX_IMAGE_NAME}}:{{.IMAGE_TAG}}
