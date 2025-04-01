@@ -73,7 +73,7 @@ RUN npm i -g corepack@latest
 RUN corepack enable
 
 ARG URL_PREFIX
-ARG DOCS_URL
+ARG DOCS_URL=http://localhost
 
 WORKDIR /app
 
