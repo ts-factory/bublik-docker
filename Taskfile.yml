@@ -179,14 +179,14 @@ tasks:
     summary: Stop development containers while preserving data
     aliases: [dev:stop]
     cmds:
-      - docker compose -f docker-compose.dev.yml down
+      - docker compose -f docker-compose.dev.yml stop
 
   docker:stop:
     desc: Stop Docker production environment
     summary: Stop and remove production containers while preserving data
     aliases: [stop]
     cmds:
-      - docker compose -f docker-compose.yml down
+      - docker compose -f docker-compose.yml stop
 
   docker:down:
     desc: Stop Docker development environment
