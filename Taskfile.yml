@@ -456,14 +456,14 @@ tasks:
     desc: Create a complete backup of database and TE logs
     silent: true
     summary: |
-      Create a complete backup archive containing both database and TE logs
+      Create a complete backup archive containing database
       Usage: task backup:create -- /path/to/backup/dir
       Default directory: ./backups/
     cmds:
       - ./scripts/backup_operations.sh create {{.BACKUP_DIR}}
 
   backup:restore:
-    desc: Restore both database and TE logs from a backup archive
+    desc: Restore database from a backup archive
     silent: true
     summary: |
       Restore complete backup from an archive

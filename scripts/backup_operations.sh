@@ -6,22 +6,21 @@ get_container_name() {
 }
 
 # Check required environment variables
-if [ -z "$DB_USER" ] || [ -z "$DB_NAME" ] || [ -z "$BUBLIK_DOCKER_DATA_DIR" ]; then
+if [ -z "$DB_USER" ] || [ -z "$DB_NAME" ]; then
   echo "❌ Required environment variables not set"
-  echo "Required: DB_USER, DB_NAME, BUBLIK_DOCKER_DATA_DIR"
+  echo "Required: DB_USER, DB_NAME"
   exit 1
 fi
 
 COMPOSE_PROJECT_NAME=${COMPOSE_PROJECT_NAME:-bublik}
 POSTGRES_CONTAINER=$(get_container_name "db")
-TE_LOG_CONTAINER=$(get_container_name "te-log-server")
 
 create_backup() {
   local backup_dir="${1:-backups}"
 
-  if [ -z "$POSTGRES_CONTAINER" ] || [ -z "$TE_LOG_CONTAINER" ]; then
-    echo "❌ Required containers not found"
-    echo "Make sure the application is running"
+  if [ -z "$POSTGRES_CONTAINER" ]; then
+    echo "❌ Database container not found"
+    echo "Make sure the database is running"
     exit 1
   fi
 
@@ -30,15 +29,7 @@ create_backup() {
 
   # Generate backup filename with timestamp
   TIMESTAMP=$(date +%Y%m%d_%H%M%S)
-  BACKUP_DIR_NAME="bublik_backup_${TIMESTAMP}"
-  FINAL_BACKUP_FILE="$backup_dir/${BACKUP_DIR_NAME}.tar.gz"
-
-  # Create temporary directory for the backup
-  TMP_DIR=$(mktemp -d)
-  BACKUP_TMP_DIR="$TMP_DIR/$BACKUP_DIR_NAME"
-  mkdir -p "$BACKUP_TMP_DIR"/{db,logs}
-
-  echo "📦 Creating complete backup..."
+  DB_BACKUP_FILE="$backup_dir/db_backup_${TIMESTAMP}.sql"
 
   # Backup database
   echo "📝 Creating database backup..."
@@ -49,52 +40,46 @@ create_backup() {
     --if-exists \
     --no-owner \
     --no-privileges \
-    > "$BACKUP_TMP_DIR/db/database.sql"; then
-    echo "✅ Database backup created"
+    > "$DB_BACKUP_FILE"; then
+    echo "✅ Database backup created at: $DB_BACKUP_FILE"
+    echo "📊 Backup size: $(du -h "$DB_BACKUP_FILE" | cut -f1)"
   else
     echo "❌ Failed to create database backup"
-    rm -rf "$TMP_DIR"
+    rm -f "$DB_BACKUP_FILE"
     exit 1
   fi
 
-  # Backup TE logs
-  echo "📝 Creating TE logs backup..."
-  if docker cp $TE_LOG_CONTAINER:/home/te-logs/logs/. "$BACKUP_TMP_DIR/logs/"; then
-    echo "✅ TE logs backup created"
-  else
-    echo "❌ Failed to copy logs from container"
-    rm -rf "$TMP_DIR"
-    exit 1
+  # Optionally create compressed version
+  read -p "Compress the backup file? [y/N] " compress_answer
+  if [[ $compress_answer =~ ^[Yy]$ ]]; then
+    COMPRESSED_FILE="${DB_BACKUP_FILE}.gz"
+    echo "📝 Compressing backup..."
+    if gzip -c "$DB_BACKUP_FILE" > "$COMPRESSED_FILE"; then
+      echo "✅ Compressed backup created at: $COMPRESSED_FILE"
+      echo "📊 Compressed size: $(du -h "$COMPRESSED_FILE" | cut -f1)"
+      read -p "Remove original uncompressed file? [y/N] " remove_answer
+      if [[ $remove_answer =~ ^[Yy]$ ]]; then
+        rm -f "$DB_BACKUP_FILE"
+        echo "✅ Original file removed"
+      fi
+    else
+      echo "❌ Failed to compress backup"
+    fi
   fi
-
-  # Create final archive
-  echo "📝 Creating backup archive..."
-  if tar -czf "$FINAL_BACKUP_FILE" -C "$TMP_DIR" "$BACKUP_DIR_NAME"; then
-    echo "✅ Backup archive created successfully at: $FINAL_BACKUP_FILE"
-    echo "📊 Backup size: $(du -h "$FINAL_BACKUP_FILE" | cut -f1)"
-  else
-    echo "❌ Failed to create backup archive"
-    rm -f "$FINAL_BACKUP_FILE"
-    rm -rf "$TMP_DIR"
-    exit 1
-  fi
-
-  # Cleanup
-  rm -rf "$TMP_DIR"
 }
 
 restore_backup() {
   local backup_file="$1"
 
-  if [ -z "$POSTGRES_CONTAINER" ] || [ -z "$TE_LOG_CONTAINER" ]; then
-    echo "❌ Required containers not found"
-    echo "Make sure the application is running"
+  if [ -z "$POSTGRES_CONTAINER" ]; then
+    echo "❌ Database container not found"
+    echo "Make sure the database is running"
     exit 1
   fi
 
   if [ -z "$backup_file" ]; then
     echo "❌ No backup file specified"
-    echo "Usage: $0 restore /path/to/backup.tar.gz"
+    echo "Usage: $0 restore /path/to/backup.sql[.gz]"
     exit 1
   fi
 
@@ -103,7 +88,7 @@ restore_backup() {
     exit 1
   fi
 
-  echo "⚠️ This will overwrite both the current database and TE logs!"
+  echo "⚠️ This will overwrite the current database!"
   echo "📝 Restore from: $backup_file"
   read -p "Continue? [y/N] " answer
   if [[ ! $answer =~ ^[Yy]$ ]]; then
@@ -111,80 +96,28 @@ restore_backup() {
     exit 0
   fi
 
-  # Create temporary directory for extraction
-  TMP_DIR=$(mktemp -d)
-
-  echo "🔄 Extracting backup archive..."
-  if tar -xzf "$backup_file" -C "$TMP_DIR"; then
-    BACKUP_DIR=$(find "$TMP_DIR" -maxdepth 1 -type d -name "bublik_backup_*")
-
-    if [ -z "$BACKUP_DIR" ]; then
-      echo "❌ Invalid backup archive structure"
-      rm -rf "$TMP_DIR"
-      exit 1
-    fi
-
-    # Restore database
-    echo "🔄 Restoring database..."
-    if [ -f "$BACKUP_DIR/db/database.sql" ]; then
-      if cat "$BACKUP_DIR/db/database.sql" | docker exec -i $POSTGRES_CONTAINER psql \
-        -U "$DB_USER" \
-        -d "$DB_NAME"; then
-        echo "✅ Database restored successfully"
-      else
-        echo "❌ Failed to restore database"
-        rm -rf "$TMP_DIR"
-        exit 1
-      fi
+  # Check if file is compressed
+  if [[ "$backup_file" == *.gz ]]; then
+    echo "🔄 Restoring from compressed backup..."
+    if gunzip -c "$backup_file" | docker exec -i $POSTGRES_CONTAINER psql \
+      -U "$DB_USER" \
+      -d "$DB_NAME"; then
+      echo "✅ Database restored successfully"
     else
-      echo "❌ Database backup not found in archive"
-      rm -rf "$TMP_DIR"
+      echo "❌ Failed to restore database"
       exit 1
     fi
-
-    # Restore TE logs
-    echo "🔄 Restoring TE logs..."
-    if [ -d "$BACKUP_DIR/logs" ]; then
-      if docker cp "$BACKUP_DIR/logs/." $TE_LOG_CONTAINER:/home/te-logs/logs/; then
-        echo "🔧 Fixing permissions..."
-        # Get host user's UID/GID from environment
-        HOST_UID=$(id -u)
-        HOST_GID=$(id -g)
-
-        # Set ownership and permissions inside container
-        docker exec $TE_LOG_CONTAINER chown -R ${HOST_UID}:${HOST_GID} /home/te-logs/logs/
-        docker exec $TE_LOG_CONTAINER chmod -R 2775 /home/te-logs/logs/
-
-        # Set permissions on host side as well
-        if [ "$EUID" -ne 0 ]; then
-          sudo chown -R ${HOST_UID}:${HOST_GID} "${BUBLIK_DOCKER_DATA_DIR}/te-logs/logs"
-          sudo chmod -R 2775 "${BUBLIK_DOCKER_DATA_DIR}/te-logs/logs"
-        else
-          chown -R ${HOST_UID}:${HOST_GID} "${BUBLIK_DOCKER_DATA_DIR}/te-logs/logs"
-          chmod -R 2775 "${BUBLIK_DOCKER_DATA_DIR}/te-logs/logs"
-        fi
-
-        echo "✅ TE logs restored successfully with correct permissions"
-      else
-        echo "❌ Failed to restore TE logs"
-        rm -rf "$TMP_DIR"
-        exit 1
-      fi
-    else
-      echo "❌ TE logs not found in archive"
-      rm -rf "$TMP_DIR"
-      exit 1
-    fi
-
-    echo "✅ Complete backup restored successfully!"
   else
-    echo "❌ Failed to extract backup archive"
-    rm -rf "$TMP_DIR"
-    exit 1
+    echo "🔄 Restoring database..."
+    if cat "$backup_file" | docker exec -i $POSTGRES_CONTAINER psql \
+      -U "$DB_USER" \
+      -d "$DB_NAME"; then
+      echo "✅ Database restored successfully"
+    else
+      echo "❌ Failed to restore database"
+      exit 1
+    fi
   fi
-
-  # Cleanup
-  rm -rf "$TMP_DIR"
 }
 
 list_backups() {
@@ -195,12 +128,12 @@ list_backups() {
     exit 1
   fi
 
-  echo "📝 Available backups in $backup_dir:"
+  echo "📝 Available database backups in $backup_dir:"
   echo "----------------------------------------"
-  if ls -lh "$backup_dir"/*.tar.gz 2>/dev/null; then
+  if ls -lh "$backup_dir"/db_backup_*.sql* 2>/dev/null; then
     echo "----------------------------------------"
   else
-    echo "No backups found"
+    echo "No database backups found"
   fi
 }
 
@@ -217,8 +150,8 @@ case "$1" in
     ;;
   *)
     echo "Usage: $0 {create|restore|list} [path]"
-    echo "  create [dir]     Create complete backup (default dir: backups)"
-    echo "  restore <file>   Restore complete backup from archive"
+    echo "  create [dir]     Create database backup (default dir: backups)"
+    echo "  restore <file>   Restore database from backup file"
     echo "  list [dir]       List available backups (default dir: backups)"
     exit 1
     ;;
