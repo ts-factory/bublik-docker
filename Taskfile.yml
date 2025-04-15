@@ -4,8 +4,6 @@ dotenv:
   - .env
 
 vars:
-  DJANGO_CONTAINER_ID:
-    sh: docker ps -q --filter "name=django"
   API_URL:
     sh: |
       fqdn="{{.BUBLIK_FQDN}}"
@@ -225,6 +223,9 @@ tasks:
   management:shell:
     desc: Launch a bash shell inside the Django container for interactive management
     aliases: [shell]
+    vars:
+      DJANGO_CONTAINER_ID:
+        sh: docker ps -q --filter "name=django"
     cmd: docker exec -it {{ .DJANGO_CONTAINER_ID }} bash
 
   management:delete-run:
@@ -232,6 +233,8 @@ tasks:
     aliases: [delete-run]
     vars:
       ID: "{{.CLI_ARGS}}"
+      DJANGO_CONTAINER_ID:
+        sh: docker ps -q --filter "name=django"
     cmd: docker exec -it {{ .DJANGO_CONTAINER_ID }} bash -c 'python manage.py delete_run -i {{ .ID }}'
 
   logs:import-log:
@@ -258,6 +261,8 @@ tasks:
     aliases: [import-command]
     vars:
       URL: "{{.CLI_ARGS}}"
+      DJANGO_CONTAINER_ID:
+        sh: docker ps -q --filter "name=django"
     cmd: docker exec -it {{ .DJANGO_CONTAINER_ID }} bash -c 'python manage.py importruns {{ .URL }}'
 
   logs:publish-incoming-logs:
