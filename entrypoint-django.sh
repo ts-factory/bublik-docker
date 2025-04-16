@@ -20,6 +20,9 @@ python manage.py collectstatic --noinput
 echo "Apply Database Migrations"
 python manage.py migrate
 
+echo "Initialize configs"
+python manage.py initialize_configs
+
 echo "Creating Superuser"
 python manage.py shell << EOF
 from django.contrib.auth import get_user_model
