@@ -272,33 +272,6 @@ tasks:
     cmds:
       - ./scripts/publish_logs.sh
 
-  docker:nuke:
-    prompt: |
-      This will remove all containers, volumes, and unused images and logs.
-      YOU WILL LOSE ALL YOUR DATA!!!
-      YOU WILL LOSE ALL YOUR DATA!!!
-      YOU WILL LOSE ALL YOUR DATA!!!
-      Are you sure you want to continue? [y/N]
-    desc: Clean Docker environment (images, volumes, and logs)
-    aliases: [nuke]
-    cmds:
-      - docker compose -f docker-compose.dev.yml down -v
-      - docker compose -f docker-compose.yml down -v
-      - docker system prune -af
-      - task: docker:nuke:remove-data
-      - test -f .env && rm .env
-
-  docker:nuke:remove-data:
-    desc: Remove Docker data directory
-    silent: true
-    internal: true
-    cmds:
-      - |
-        if [ -n "${BUBLIK_DOCKER_DATA_DIR}" ] && [ -d "${BUBLIK_DOCKER_DATA_DIR}" ]; then
-          echo "Removing ${BUBLIK_DOCKER_DATA_DIR}..."
-          rm -rf "${BUBLIK_DOCKER_DATA_DIR}"
-        fi
-
   ###########################################
   #         Deps                          #
   ###########################################
