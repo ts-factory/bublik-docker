@@ -18,7 +18,6 @@ echo "Collect Static Files"
 python manage.py collectstatic --noinput
 
 echo "Apply Database Migrations"
-python manage.py makemigrations
 python manage.py migrate
 
 echo "Creating Superuser"

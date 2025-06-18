@@ -347,6 +347,11 @@ tasks:
       - task: bootstrap:init-configs
       - task: bootstrap:import-sessions
       - task: print-env-info
+  
+  migrations:transition_1.8.0_to_1.9.0:
+    desc: Handle migrations when updating to version 1.9.0 and higher from 1.8.0 and lower
+    cmds:
+      - ./scripts/create_migrations.sh
 
   print-env-info:
     desc: Print environment information
