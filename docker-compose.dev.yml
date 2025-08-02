@@ -262,6 +262,7 @@ services:
       - BUBLIK_DOCKER_TE_LOG_SERVER_PORT=${BUBLIK_DOCKER_TE_LOG_SERVER_PORT}
       - BUBLIK_DOCKER_DJANGO_PORT=${BUBLIK_DOCKER_DJANGO_PORT}
       - BUBLIK_DOCKER_BUBLIK_UI_PORT=${BUBLIK_DOCKER_BUBLIK_UI_PORT}
+      - BUBLIK_DOCKER_DOCS_PORT=${BUBLIK_DOCKER_DOCS_PORT}
       - FLOWER_PORT=${FLOWER_PORT}
     depends_on:
       - django
@@ -287,6 +288,29 @@ services:
             - node_modules
         - action: rebuild
           path: ./bublik-ui/package.json
+
+  bublik-docs:
+    container_name: ${COMPOSE_PROJECT_NAME}-bublik-docs
+    network_mode: host
+    command: pnpm run start
+    build:
+      dockerfile: Dockerfile
+      target: docs-base
+      args:
+        - URL_PREFIX=${URL_PREFIX}
+        - DOCS_URL=${DOCS_URL:-http://localhost}
+    environment:
+      - BASE_URL=${URL_PREFIX}/docs
+      - BUBLIK_DOCKER_DOCS_PORT=${BUBLIK_DOCKER_DOCS_PORT:-3000}
+    develop:
+      watch:
+        - action: sync
+          path: ./bublik-release
+          target: /app
+          ignore:
+            - node_modules
+        - action: rebuild
+          path: ./bublik-release/package.json
 
   mailpit:
     container_name: ${COMPOSE_PROJECT_NAME}-mailpit

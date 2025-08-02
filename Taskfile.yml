@@ -472,6 +472,7 @@ tasks:
     aliases: [build]
     silent: true
     cmds:
+      - task: docker:setup:django-settings
       - task: docker:build:runner
       - task: docker:build:log-server
       - task: docker:build:nginx
