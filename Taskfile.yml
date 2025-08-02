@@ -275,7 +275,6 @@ tasks:
   ###########################################
   #         Deps                          #
   ###########################################
-
   check-deps:
     desc: Check if system dependencies are installed
     summary: Verify that all required system and Docker dependencies are available
@@ -347,7 +346,7 @@ tasks:
       - task: bootstrap:init-configs
       - task: bootstrap:import-sessions
       - task: print-env-info
-  
+
   migrations:transition_1.8.0_to_1.9.0:
     desc: Handle migrations when updating to version 1.9.0 and higher from 1.8.0 and lower
     cmds:
@@ -484,9 +483,9 @@ tasks:
       - >
         docker build
         --target runner
-        --build-arg URL_PREFIX={{.URL_PREFIX}}
-        --build-arg DOCS_URL={{.DOCS_URL}}
-        -t {{.DOCKER_REGISTRY}}/{{.DOCKER_ORG}}/{{.RUNNER_IMAGE_NAME}}:{{.IMAGE_TAG}}
+        --build-arg URL_PREFIX=${URL_PREFIX}
+        --build-arg DOCS_URL=${DOCS_URL}
+        -t ${DOCKER_REGISTRY}/${DOCKER_ORG}/${RUNNER_IMAGE_NAME}:${IMAGE_TAG}
         .
 
   docker:build:log-server:
@@ -496,9 +495,9 @@ tasks:
       - >
         docker build
         --target log-server
-        --build-arg URL_PREFIX={{.URL_PREFIX}}
-        --build-arg DOCS_URL={{.DOCS_URL}}
-        -t {{.DOCKER_REGISTRY}}/{{.DOCKER_ORG}}/{{.LOG_SERVER_IMAGE_NAME}}:{{.IMAGE_TAG}}
+        --build-arg URL_PREFIX=${URL_PREFIX}
+        --build-arg DOCS_URL=${DOCS_URL}
+        -t ${DOCKER_REGISTRY}/${DOCKER_ORG}/${LOG_SERVER_IMAGE_NAME}:${IMAGE_TAG}
         .
 
   docker:build:nginx:
@@ -507,9 +506,9 @@ tasks:
     cmds:
       - >
         docker build
-        --build-arg URL_PREFIX={{.URL_PREFIX}}
-        --build-arg DOCS_URL={{.DOCS_URL}}
-        -t {{.DOCKER_REGISTRY}}/{{.DOCKER_ORG}}/{{.NGINX_IMAGE_NAME}}:{{.IMAGE_TAG}}
+        --build-arg URL_PREFIX=${URL_PREFIX}
+        --build-arg DOCS_URL=${DOCS_URL}
+        -t ${DOCKER_REGISTRY}/${DOCKER_ORG}/${NGINX_IMAGE_NAME}:${IMAGE_TAG}
         -f ./nginx/Dockerfile
         .
 
@@ -518,6 +517,6 @@ tasks:
     summary: Push Runner, Log Server, and Nginx images to container registry
     aliases: [push]
     cmds:
-      - docker push {{.DOCKER_REGISTRY}}/{{.DOCKER_ORG}}/{{.RUNNER_IMAGE_NAME}}:{{.IMAGE_TAG}}
-      - docker push {{.DOCKER_REGISTRY}}/{{.DOCKER_ORG}}/{{.LOG_SERVER_IMAGE_NAME}}:{{.IMAGE_TAG}}
-      - docker push {{.DOCKER_REGISTRY}}/{{.DOCKER_ORG}}/{{.NGINX_IMAGE_NAME}}:{{.IMAGE_TAG}}
+      - docker push ${DOCKER_REGISTRY}/${DOCKER_ORG}/${RUNNER_IMAGE_NAME}:${IMAGE_TAG}
+      - docker push ${DOCKER_REGISTRY}/${DOCKER_ORG}/${LOG_SERVER_IMAGE_NAME}:${IMAGE_TAG}
+      - docker push ${DOCKER_REGISTRY}/${DOCKER_ORG}/${NGINX_IMAGE_NAME}:${IMAGE_TAG}
