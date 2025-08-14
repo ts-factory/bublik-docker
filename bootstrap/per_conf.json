@@ -1,58 +1,44 @@
 {
-  "PROJECT": "ts-factory",
+  "EMAIL_FROM": "noreply@ts-factory.io",
+  "EMAIL_HOST": "localhost",
+  "EMAIL_PORT": 25,
+  "UI_VERSION": 2,
+  "EMAIL_ADMINS": ["bublik@ts-factory.io"],
+  "EMAIL_TIMEOUT": 60,
+  "EMAIL_USE_TLS": true,
   "RUN_KEY_METAS": ["START_TIMESTAMP", "CFG"],
   "DASHBOARD_DATE": "CAMPAIGN_DATE",
   "RUN_STATUS_META": "RUN_STATUS",
   "DASHBOARD_HEADER": [
     {
-      "key": "iut",
-      "label": "IUT"
+      "key": "status",
+      "label": "Status"
     },
     {
       "key": "total",
       "label": "Total"
     },
     {
-      "key": "status",
-      "label": "Status"
-    },
-    {
-      "key": "ts_name",
-      "label": "Test Suite"
-    },
-    {
-      "key": "variant",
-      "label": "Variant"
-    },
-    {
-      "key": "progress",
-      "label": "Executed"
-    },
-    {
       "key": "unexpected",
       "label": "NOK"
     },
     {
-      "key": "configuration",
-      "label": "Configuration"
+      "key": "progress",
+      "label": "Progress"
     },
     {
       "key": "notes",
       "label": "Notes"
     }
   ],
-  "DASHBOARD_PAYLOAD": {
-    "notes": "go_bug",
-    "total": "go_tree",
-    "unexpected": "go_run_failed",
-    "configuration": "go_run"
-  },
-  "METADATA_ON_PAGES": ["Test Suite", "Configuration"],
+  "METADATA_ON_PAGES": ["Configuration"],
   "RUN_COMPLETE_FILE": ".done",
   "SPECIAL_CATEGORIES": ["Configuration"],
   "DASHBOARD_RUNS_SORT": ["start"],
   "CSRF_TRUSTED_ORIGINS": [],
   "DASHBOARD_DEFAULT_MODE": "two_days_two_columns",
   "EMAIL_PROJECT_WATCHERS": [],
-  "RUN_STATUS_BY_NOK_BORDERS": [20, 80]
+  "RUN_STATUS_BY_NOK_BORDERS": [20, 80],
+  "FILES_TO_GENERATE_METADATA": ["meta_data.txt"],
+  "NOT_PERMISSION_REQUIRED_ACTIONS": []
 }
