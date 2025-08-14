@@ -3,42 +3,77 @@
     "type": "label",
     "category": "Test Suite",
     "set-comment": "Label with category test suite name",
-    "set-pattern": "TS_NAME"
+    "set-patterns": ["TS_NAME"]
   },
   {
     "type": "label",
     "category": "Configuration",
     "set-comment": "Label with category Configuration",
-    "set-pattern": "CFG"
+    "set-patterns": ["CFG"]
   },
   {
     "type": "label",
     "category": "Variant",
     "set-comment": "Label with category variant",
-    "set-pattern": "MODE|RX_DATAPATH|TX_DATAPATH"
+    "set-patterns": ["MODE|RX_DATAPATH|TX_DATAPATH"]
   },
   {
     "type": "label",
     "category": "IUT",
     "set-comment": "Label with category Implementation Under Testing",
-    "set-pattern": "IUT"
+    "set-patterns": ["IUT"]
   },
   {
     "type": "branch",
     "category": "Branch",
     "set-comment": "Label with category Branch",
-    "set-pattern": "DPDK_BRANCH"
+    "set-patterns": ["DPDK_BRANCH"]
   },
   {
     "type": "label",
     "category": "Status",
     "set-comment": "Label with category Status",
-    "set-pattern": "RUN_STATUS"
+    "set-patterns": ["RUN_STATUS"]
   },
   {
     "type": "note",
     "category": "Notes",
     "set-comment": "Compromised mark and other session details",
-    "set-pattern": "compromised|detail"
+    "set-patterns": ["compromised|detail"]
+  },
+  {
+    "type": "tag",
+    "category": "nics",
+    "set-comment": "NIC type",
+    "set-patterns": ["pci-.+$"],
+    "set-priority": 2
+  },
+  {
+    "type": "tag",
+    "category": "datapaths",
+    "set-comment": "Tested datapath if applicable",
+    "set-patterns": ["tx-datapath-.+|rx-datapath-.+$"],
+    "set-priority": 3
+  },
+  {
+    "type": "tag",
+    "category": "fw-variants",
+    "set-comment": "FW variant information",
+    "set-patterns": ["tx-.+|rx-.+$"],
+    "set-priority": 4
+  },
+  {
+    "type": "tag",
+    "category": "drivers",
+    "set-comment": "Kernel driver",
+    "set-patterns": [
+      "vfio-pci|igb_uio|uio_pci_generic|virtio-pci|igb|sfc|sfc_ef100|xlnx_efct$"
+    ],
+    "set-priority": 1
+  },
+  {
+    "type": "tag",
+    "category": "irrelevant_tag",
+    "set-priority": 10
   }
 ]
