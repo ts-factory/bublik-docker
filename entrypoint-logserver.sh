@@ -4,14 +4,35 @@ source /app/bublik/entrypoint-common.sh
 
 setup_umask
 
+fix_permissions_watcher() {
+    echo "Starting inotify permission watcher for /home/te-logs/logs..."
+    echo "Fixing permissions on existing files..."
+    find /home/te-logs/logs -type d -exec chmod 2775 {} \; 2>/dev/null
+    find /home/te-logs/logs -type f -exec chmod 664 {} \; 2>/dev/null
+    chgrp -R www-data /home/te-logs/logs 2>/dev/null
+
+    inotifywait -m -r -e create,moved_to /home/te-logs/logs --format '%w%f' 2>/dev/null | while read FILE
+    do
+        if [ -f "$FILE" ]; then
+            chmod 664 "$FILE" 2>/dev/null
+            chgrp www-data "$FILE" 2>/dev/null
+            echo "Fixed permissions for file: $FILE"
+        elif [ -d "$FILE" ]; then
+            chmod 2775 "$FILE" 2>/dev/null
+            chgrp www-data "$FILE" 2>/dev/null
+            echo "Fixed permissions for directory: $FILE"
+        fi
+    done
+}
+
 process_templates() {
     echo "Processing templates..."
-    
+
     PORT_SUFFIX=""
     if [ "${BUBLIK_DOCKER_PROXY_PORT}" != "80" ]; then
         PORT_SUFFIX=":${BUBLIK_DOCKER_PROXY_PORT}"
     fi
-    
+
     cp /app/te-templates/te-logs-error404.template /home/te-logs/cgi-bin/te-logs-error404
     cp /app/te-templates/te-logs-index.template /home/te-logs/cgi-bin/te-logs-index
     cp /app/te-templates/publish-logs-unpack.sh /home/te-logs/bin/
@@ -74,7 +95,7 @@ process_templates() {
         -e "s,@@LOGS_DIR@@,/home/te-logs/logs,g" \
         -e "s,@@LOGS_URL_PATH@@,${URL_PREFIX}/logs,g" \
         /etc/apache2/conf-available/te-logs.conf
-    
+
     echo "Templates processed successfully."
 }
 
@@ -101,6 +122,8 @@ a2enconf te-logs
 sed -i \
     -e 's/Listen 80/Listen ${BUBLIK_DOCKER_TE_LOG_SERVER_PORT}/' \
     /etc/apache2/ports.conf
+
+fix_permissions_watcher &
 
 echo "Starting Apache"
 exec apache2ctl -D FOREGROUND

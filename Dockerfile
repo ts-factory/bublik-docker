@@ -111,10 +111,11 @@ WORKDIR /app/bublik
 FROM base AS log-server
 
 RUN apt-get update && apt-get install -y \
-  apache2 \
-  file \
-  jq \
-  && rm -rf /var/lib/apt/lists/*
+    apache2 \
+    file \
+    jq \
+    inotify-tools \
+    && rm -rf /var/lib/apt/lists/*
 
 RUN a2enmod cgid
 
