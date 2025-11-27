@@ -65,7 +65,7 @@ RUN ./dispatcher.sh -q --conf-builder=builder.conf.tools --no-run
 ###########################################
 #         Documentation 
 ###########################################
-FROM node:22.13-alpine AS docs-base
+FROM node:24.11-alpine AS docs-base
 
 ENV PNPM_HOME="/pnpm"
 ENV PATH="$PNPM_HOME:$PATH"
