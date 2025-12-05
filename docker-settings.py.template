@@ -111,8 +111,24 @@ LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
     'formatters': {
-        'detailed': {'format': '[%(asctime)s][%(levelname)s](%(module)s) %(message)s'},
-        'simple': {'format': '[%(asctime)s][%(levelname)s] %(message)s'},
+        'detailed': {
+            'format': '[%(asctime)s][%(levelname)s](%(module)s) %(message)s',
+        },
+        'simple': {
+            'format': '%(message)s',
+        },
+        'colored': {
+            '()': 'colorlog.ColoredFormatter',
+            'format': '%(log_color)s%(message)s%(reset)s',
+            'log_colors': {
+                'DEBUG': 'cyan',
+                'INFO': 'blue',
+                'SUCCESS': 'green',
+                'WARNING': 'yellow',
+                'ERROR': 'red',
+                'CRITICAL': 'bold_red',
+            },
+        },
         'json': {
             'format': '%(asctime)s %(levelname)s %(module)s %(message)s',
             'class': 'pythonjsonlogger.jsonlogger.JsonFormatter',
@@ -122,18 +138,23 @@ LOGGING = {
         'command.console': {
             'level': 'DEBUG' if DEBUG else 'INFO',
             'class': 'logging.StreamHandler',
-            'formatter': 'detailed',
+            'formatter': 'json',
         },
         'console': {
             'level': 'DEBUG' if DEBUG else 'INFO',
             'class': 'logging.StreamHandler',
             'formatter': 'simple',
         },
+        'console.color': {
+            'level': 'DEBUG' if DEBUG else 'INFO',
+            'class': 'logging.StreamHandler',
+            'formatter': 'colored',
+        },
         'file.debug': {
             'level': 'DEBUG',
             'class': 'logging.handlers.RotatingFileHandler',
             'filename': os.path.join(BASE_DIR, 'logs/debug.log'),
-            'maxBytes': 15728640,  # 1024 * 1024 * 15B = 15MB
+            'maxBytes': 15728640, # 1024 * 1024 * 15B = 15MB
             'backupCount': 10,
             'formatter': 'detailed',
         },
@@ -142,6 +163,11 @@ LOGGING = {
         '': {
             'handlers': ['console'],
             'level': DJANGO_LOG_LEVEL,
+        },
+        'color': {
+            'handlers': ['console.color'],
+            'level': DJANGO_LOG_LEVEL,
+            'propagate': False,
         },
         'bublik.server': {
             'handlers': ['command.console'],
