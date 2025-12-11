@@ -78,18 +78,6 @@ services:
         - path: ./bublik/requirements.txt
           action: rebuild
 
-  db:
-    container_name: ${COMPOSE_PROJECT_NAME}-db
-    image: postgres
-    environment:
-      POSTGRES_DB: bublik
-      POSTGRES_USER: bublik
-      POSTGRES_PASSWORD: bublik
-    volumes:
-      - db_data:/var/lib/postgresql/data/
-    ports:
-      - ${DB_PORT}:5432
-
   redis:
     container_name: ${COMPOSE_PROJECT_NAME}-redis
     image: redis

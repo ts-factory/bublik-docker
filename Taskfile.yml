@@ -162,7 +162,7 @@ tasks:
     deps: [docker:setup]
     aliases: [dev:watch]
     cmds:
-      - docker compose -f docker-compose.dev.yml up --build --watch
+      - docker compose -f docker-compose.dev.yml -f docker-compose.db.yml up --build --watch
       - echo "🚀 Development environment started at {{.API_URL}}"
 
   docker:dev:up:
@@ -171,7 +171,7 @@ tasks:
     aliases: [dev:up]
     silent: true
     cmds:
-      - docker compose -f docker-compose.dev.yml up --build -d
+      - docker compose -f docker-compose.dev.yml -f docker-compose.db.yml up --build -d
       - echo "🚀 Development environment started at {{.API_URL}}"
 
   docker:dev:start:
@@ -180,7 +180,7 @@ tasks:
     aliases: [dev:start]
     silent: true
     cmds:
-      - docker compose -f docker-compose.dev.yml start
+      - docker compose -f docker-compose.dev.yml -f docker-compose.db.yml start
       - echo "🚀 Development environment started at {{.API_URL}}"
 
   docker:start:
@@ -227,7 +227,7 @@ tasks:
     summary: Stop development containers while preserving data
     aliases: [dev:stop]
     cmds:
-      - docker compose -f docker-compose.dev.yml stop
+      - docker compose -f docker-compose.dev.yml -f docker-compose.db.yml stop
 
   docker:stop:
     desc: Stop Docker production environment
@@ -248,7 +248,7 @@ tasks:
     summary: Stop and remove development containers while preserving data
     aliases: [dev:down]
     cmds:
-      - docker compose -f docker-compose.dev.yml down
+      - docker compose -f docker-compose.dev.yml -f docker-compose.db.yml down
 
   management:shell:
     desc: Launch a bash shell inside the Django container for interactive management
