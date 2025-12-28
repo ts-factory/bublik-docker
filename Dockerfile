@@ -115,6 +115,7 @@ RUN apt-get update && apt-get install -y \
     file \
     jq \
     inotify-tools \
+    tshark \
     && rm -rf /var/lib/apt/lists/*
 
 RUN a2enmod cgid
