@@ -222,7 +222,7 @@ CACHES = {
             },
         },
     },
-    'config': {
+    'project': {
         'BACKEND': 'redis_cache.RedisCache',
         'LOCATION': f'{REDIS_HOST}:{REDIS_PORT}',
         'TIMEOUT': 86400,
