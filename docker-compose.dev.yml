@@ -271,15 +271,16 @@ services:
       dockerfile: ./apps/bublik/Dockerfile.dev
     environment:
       - BASE_URL=${URL_PREFIX}/v2
-    ## ports:
-    ##  - ${BUBLIK_DOCKER_BUBLIK_UI_PORT}:4200
     develop:
       watch:
         - action: sync
-          path: ./bublik-ui
-          target: /app
-          ignore:
-            - node_modules
+          path: ./bublik-ui/libs
+          target: /app/libs
+
+        - action: sync
+          path: ./bublik-ui/apps
+          target: /app/apps
+
         - action: rebuild
           path: ./bublik-ui/package.json
 
