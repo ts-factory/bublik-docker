@@ -29,8 +29,24 @@ process_templates() {
     echo "Processing templates..."
 
     PORT_SUFFIX=""
+    EXT_PORT_SUFFIX=""
     if [ "${BUBLIK_DOCKER_PROXY_PORT}" != "80" ]; then
         PORT_SUFFIX=":${BUBLIK_DOCKER_PROXY_PORT}"
+    fi
+
+    # Hereby we try to resolve the problem if the truly external port is
+    # different from the one internally assigned to docker proxy.
+    if [ "${BUBLIK_DOCKER_PROXY_EXT_PORT}" == "proto_default" ] ; then
+        # If the port is set to "proto_default", we don't append it to the url
+        # believing that the port would better be derived from the protocol
+        # (443 for https, 80 for http)
+        EXT_PORT_SUFFIX=""
+    elif [ "${BUBLIK_DOCKER_PROXY_EXT_PORT}" != "" ] ; then
+        # The port is set - use it
+        EXT_PORT_SUFFIX=":${BUBLIK_DOCKER_PROXY_EXT_PORT}"
+    else
+        # Otherwise, it is the same as normal PORT_SUFFIX. Fallback value.
+        EXT_PORT_SUFFIX="${PORT_SUFFIX}"
     fi
 
     cp /app/te-templates/te-logs-error404.template /home/te-logs/cgi-bin/te-logs-error404
@@ -78,8 +94,8 @@ process_templates() {
         -e "s,@@TE_INSTALL@@,/app/te/build/inst,g" \
         -e "s,/srv/logs,/home/te-logs/logs,g" \
         -e "s,root_dir=\"/srv/logs\",root_dir=\"/home/te-logs/logs\",g" \
-        -e "s,@@BUBLIK_URL@@,${BUBLIK_FQDN}${PORT_SUFFIX}${URL_PREFIX},g" \
-        -e "s,@@LOGS_URL@@,${BUBLIK_FQDN}${PORT_SUFFIX}${URL_PREFIX}/logs,g" \
+        -e "s,@@BUBLIK_URL@@,${BUBLIK_FQDN}${EXT_PORT_SUFFIX}${URL_PREFIX},g" \
+        -e "s,@@LOGS_URL@@,${BUBLIK_FQDN}${EXT_PORT_SUFFIX}${URL_PREFIX}/logs,g" \
         -e "s,@@LOGS_DIR@@,/home/te-logs/logs,g" \
         -e "s,@@LOGS_INCOMING@@,/home/te-logs/incoming,g" \
         -e "s,@@LOGS_BAD@@,/home/te-logs/bad,g" \
