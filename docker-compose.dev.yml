@@ -85,7 +85,7 @@ services:
     expose:
       - ${REDIS_PORT}
     ports:
-      - ${REDIS_PORT}:6379
+      - ${REDIS_HOST}:${REDIS_PORT}:6379
 
   rabbitmq:
     container_name: ${COMPOSE_PROJECT_NAME}-rabbitmq
