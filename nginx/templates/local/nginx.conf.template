@@ -27,6 +27,14 @@ server {
     listen ${BUBLIK_DOCKER_PROXY_PORT};
     large_client_header_buffers 16 5120k;
 
+    gzip on;
+    gzip_vary on;
+    gzip_proxied any;
+    gzip_comp_level 5;
+    gzip_min_length 1024;
+    gzip_types text/plain text/css text/xml application/json application/javascript application/rss+xml application/atom+xml image/svg+xml;
+    gzip_disable "msie6";
+
     location ${URL_PREFIX}/ {
         proxy_pass http://django;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;

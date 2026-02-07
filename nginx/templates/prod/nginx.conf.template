@@ -19,6 +19,23 @@ server {
     listen ${BUBLIK_DOCKER_PROXY_PORT};
     large_client_header_buffers 16 5120k;
 
+    gzip on;
+    gzip_vary on;
+    gzip_proxied any;
+    gzip_comp_level 5;
+    gzip_min_length 1024;
+    gzip_types text/plain text/css text/xml application/json application/javascript application/rss+xml application/atom+xml image/svg+xml;
+    gzip_disable "msie6";
+
+    sendfile on;
+    tcp_nopush on;
+    tcp_nodelay on;
+    etag on;
+    open_file_cache max=10000 inactive=20s;
+    open_file_cache_valid 30s;
+    open_file_cache_min_uses 2;
+    open_file_cache_errors on;
+
     location ${URL_PREFIX}/ {
         proxy_pass http://django;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
@@ -37,10 +54,17 @@ server {
         proxy_set_header Connection "upgrade";
     }
 
+    location ~* ^$URL_PREFIX/v2/(.+\.(?:js|css|map|json|png|jpe?g|gif|svg|webp|ico|woff2?|ttf|eot))$ {
+        alias /app/bublik-ui/$1;
+        expires 1y;
+        add_header Cache-Control "public, max-age=31536000, immutable";
+    }
+
     location $URL_PREFIX/v2/ {
         alias /app/bublik-ui/;
         index index.html;
         try_files ${DOLLAR}uri $URL_PREFIX/v2/index.html;
+        add_header Cache-Control "no-cache";
     }
 
     location ${URL_PREFIX}/logs {
