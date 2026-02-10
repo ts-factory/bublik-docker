@@ -45,12 +45,12 @@ ENV PATH="/root/.local/bin/:$PATH"
 ENV UV_HTTP_TIMEOUT=2400
 
 # Install dependencies using uv pip
-RUN uv pip install --system --no-cache-dir meson==1.6.1 watchfiles==1.0.4
+RUN uv pip install --system --no-cache-dir meson==1.6.1 watchfiles==1.0.4 setuptools==81.0.0 Cython pybind11
 
 RUN mkdir bublik
 
 COPY ./bublik/requirements.txt /app/bublik/requirements.txt
-RUN uv pip install --system --no-cache-dir -r /app/bublik/requirements.txt
+RUN uv pip install --system --no-cache-dir --no-build-isolation -r /app/bublik/requirements.txt
 
 COPY ./entrypoint-common.sh /app/bublik/entrypoint-common.sh
 COPY ./entrypoint-django.sh /app/bublik/entrypoint-django.sh
