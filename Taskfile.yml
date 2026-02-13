@@ -250,6 +250,11 @@ tasks:
     cmds:
       - docker compose -f docker-compose.dev.yml -f docker-compose.db.yml down
 
+  management:redis:reset-cache:
+    desc: Reset redis cache
+    aliases: [reset-redis-cache]
+    cmd: docker compose exec -it redis bash -c 'redis-cli flushall'
+
   management:shell:
     desc: Launch a bash shell inside the Django container for interactive management
     aliases: [shell]
