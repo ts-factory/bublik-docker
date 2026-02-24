@@ -19,6 +19,7 @@ RUN apt-get update \
   flex \
   bison \
   ninja-build \
+  gawk \
   libjansson-dev \
   libjansson-doc \
   libjansson4 \
@@ -51,6 +52,7 @@ RUN mkdir bublik
 
 COPY ./bublik/requirements.txt /app/bublik/requirements.txt
 RUN uv pip install --system --no-cache-dir --no-build-isolation -r /app/bublik/requirements.txt
+RUN rm -f /usr/local/bin/ninja && ln -s /usr/bin/ninja /usr/local/bin/ninja
 
 COPY ./entrypoint-common.sh /app/bublik/entrypoint-common.sh
 COPY ./entrypoint-django.sh /app/bublik/entrypoint-django.sh
