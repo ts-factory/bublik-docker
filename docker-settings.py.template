@@ -63,6 +63,12 @@ INSTALLED_APPS = [
     'drf_spectacular_sidecar',
 ]
 
+ANALYTICS_ENABLED = os.getenv('ANALYTICS_ENABLED', '0').lower() in ('1', 'true', 'yes')
+ANALYTICS_DB_PATH = os.getenv('ANALYTICS_DB_PATH', '/app/bublik/logs/analytics.sqlite3')
+
+if ANALYTICS_ENABLED:
+    INSTALLED_APPS.append('bublik.analytics')
+
 if not DEBUG:
     # cache SQL queries in non-debug mode
     INSTALLED_APPS.append('cachalot')
@@ -202,6 +208,13 @@ DATABASES = {
         'PORT': os.getenv('DB_PORT', '5432'),
     },
 }
+
+if ANALYTICS_ENABLED:
+    DATABASES['analytics'] = {
+        'ENGINE': 'django.db.backends.sqlite3',
+        'NAME': ANALYTICS_DB_PATH,
+    }
+    DATABASE_ROUTERS = ['bublik.analytics.db_router.AnalyticsRouter']
 
 REDIS_PORT = os.getenv('REDIS_PORT', '6379')
 REDIS_HOST = os.getenv('REDIS_HOST', 'redis')

@@ -20,6 +20,12 @@ python manage.py collectstatic --noinput
 echo "Apply Database Migrations"
 python manage.py migrate
 
+ANALYTICS_ENABLED_NORMALIZED=$(echo "${ANALYTICS_ENABLED:-0}" | tr '[:upper:]' '[:lower:]')
+if [ "$ANALYTICS_ENABLED_NORMALIZED" = "1" ] || [ "$ANALYTICS_ENABLED_NORMALIZED" = "true" ] || [ "$ANALYTICS_ENABLED_NORMALIZED" = "yes" ]; then
+  echo "Apply Analytics Database Migrations"
+  python manage.py migrate --database=analytics
+fi
+
 echo "Initialize configs"
 python manage.py initialize_configs
 
