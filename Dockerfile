@@ -65,14 +65,18 @@ COPY ./test-environment .
 RUN ./dispatcher.sh -q --conf-builder=builder.conf.tools --no-run
 
 ###########################################
-#         Documentation 
+#         Documentation
 ###########################################
 FROM node:24.11-alpine AS docs-base
 
 ENV PNPM_HOME="/pnpm"
 ENV PATH="$PNPM_HOME:$PATH"
-RUN npm i -g corepack@latest
-RUN corepack enable
+
+ARG PNPM_VERSION=10.24.0
+
+RUN npm i -g corepack@latest \
+    && corepack enable \
+    && corepack prepare "pnpm@${PNPM_VERSION}" --activate
 
 WORKDIR /app
 

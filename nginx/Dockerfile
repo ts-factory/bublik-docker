@@ -3,8 +3,13 @@ FROM node:24.11-alpine AS frontend-builder
 ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
 ENV PNPM_HOME="/pnpm"
 ENV PATH="$PNPM_HOME:$PATH"
-RUN npm i -g corepack@latest
-RUN corepack enable
+
+ARG PNPM_VERSION=10.24.0
+
+RUN npm i -g corepack@latest \
+    && corepack enable \
+    && corepack prepare "pnpm@${PNPM_VERSION}" --activate
+
 ARG URL_PREFIX=""
 
 RUN pnpm add -g nx
