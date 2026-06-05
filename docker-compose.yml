@@ -57,7 +57,6 @@ services:
       - HOST_GID=${HOST_GID:-1000}
       - UMASK=${UMASK:-022}
     depends_on:
-      - db
       - redis
       - rabbitmq
     volumes:
@@ -162,7 +161,7 @@ services:
       - ${REDIS_HOST}:${REDIS_PORT}:6379
 
   rabbitmq:
-    image: rabbitmq:4-management
+    image: rabbitmq:4.2-management
     ports:
       - ${RABBITMQ_PORT}:5672
     restart: unless-stopped
