@@ -174,7 +174,7 @@ services:
 
   celery:
     image: ${DOCKER_REGISTRY:-ghcr.io}/${DOCKER_ORG:-ts-factory}/${RUNNER_IMAGE_NAME:-bublik-runner}:${IMAGE_TAG:-latest}
-    command: celery -A ${CELERY_APP} worker --max-tasks-per-child ${CELERYD_MAX_TASKS_PER_CHILD} --concurrency 1 -l ${CELERY_LOG_LEVEL}
+    command: celery -A ${CELERY_APP} worker --max-tasks-per-child ${CELERYD_MAX_TASKS_PER_CHILD} --concurrency 1 --prefetch-multiplier 1 -l ${CELERY_LOG_LEVEL}
     restart: unless-stopped
     environment:
       - BUBLIK_DOCKER_PROXY_PORT=${BUBLIK_DOCKER_PROXY_PORT}

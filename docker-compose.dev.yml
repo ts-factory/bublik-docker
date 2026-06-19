@@ -191,7 +191,7 @@ services:
         - URL_PREFIX=${URL_PREFIX}
         - DOCS_URL=${DOCS_URL}
     command: >
-      watchfiles --filter python 'celery -A ${CELERY_APP} worker --max-tasks-per-child ${CELERYD_MAX_TASKS_PER_CHILD} --concurrency 1 -l ${CELERY_LOG_LEVEL}'
+      watchfiles --filter python 'celery -A ${CELERY_APP} worker --max-tasks-per-child ${CELERYD_MAX_TASKS_PER_CHILD} --concurrency 1 --prefetch-multiplier 1 -l ${CELERY_LOG_LEVEL}'
     entrypoint: ./entrypoint-celery.sh
     depends_on:
       - db
