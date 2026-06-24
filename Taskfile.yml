@@ -506,6 +506,7 @@ tasks:
     cmds:
       - >
         docker build
+        --network=host
         --target runner
         --build-arg URL_PREFIX=${URL_PREFIX}
         --build-arg DOCS_URL=${DOCS_URL}
@@ -518,6 +519,7 @@ tasks:
     cmds:
       - >
         docker build
+        --network=host
         --target log-server
         --build-arg URL_PREFIX=${URL_PREFIX}
         --build-arg DOCS_URL=${DOCS_URL}
@@ -530,6 +532,7 @@ tasks:
     cmds:
       - >
         docker build
+        --network=host
         --build-arg URL_PREFIX=${URL_PREFIX}
         --build-arg DOCS_URL=${DOCS_URL}
         -t ${DOCKER_REGISTRY}/${DOCKER_ORG}/${NGINX_IMAGE_NAME}:${IMAGE_TAG}
