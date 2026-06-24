@@ -22,7 +22,12 @@ RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --frozen-lockfile
 
 COPY ./bublik-ui ./
 
-RUN BASE_URL="$URL_PREFIX/v2" nx run bublik:build --base="$URL_PREFIX/v2" --sourcemap="true"
+ARG SOURCE_MAP=""
+
+RUN BASE_URL="$URL_PREFIX/v2" \
+    nx run bublik:build \
+    --base="$URL_PREFIX/v2" \
+    ${SOURCE_MAP:+--sourcemap=true}
 
 FROM nginx:1.27-alpine
 

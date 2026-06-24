@@ -16,6 +16,7 @@ env:
   LOG_SERVER_IMAGE_NAME: bublik-log-server
   # Add your URL prefix here if you host with base url
   URL_PREFIX: ""
+  SOURCE_MAP: "true"
 
 jobs:
   build:
@@ -111,6 +112,7 @@ jobs:
           platforms: ${{ matrix.platform }}
           build-args: |
             URL_PREFIX=${{ env.URL_PREFIX }}
+            SOURCE_MAP=${{ env.SOURCE_MAP }}
           push: true
           labels: ${{ steps.meta.outputs.labels }}
           outputs: type=image,push-by-digest=true,name-canonical=true,push=true
