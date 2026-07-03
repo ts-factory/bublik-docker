@@ -19,6 +19,11 @@ map $http_upgrade $connection_upgrade {
     ''      close;
 }
 
+map $http_x_forwarded_proto $forwarded_proto {
+    default $http_x_forwarded_proto;
+    ""      $scheme;
+}
+
 server {
     listen ${BUBLIK_DOCKER_PROXY_PORT};
     large_client_header_buffers 16 5120k;
@@ -42,10 +47,12 @@ server {
 
     location ${URL_PREFIX}/ {
         proxy_pass http://django;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+
         proxy_set_header Host $http_host;
-        proxy_set_header X-Forwarded-Proto $scheme;
         proxy_set_header X-Forwarded-Host $http_host;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $forwarded_proto;
+
         proxy_redirect off;
     }
 
