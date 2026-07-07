@@ -34,7 +34,7 @@ BUBLIK_WEB_STATIC = os.getenv('BUBLIK_WEB_STATIC', '')
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/1.11/howto/deployment/checklist/
 
-SECRET_KEY = os.getenv('SECRET_KEY')
+SECRET_KEY = os.getenv('SECRET_KEY', 'development')
 
 DEBUG = os.getenv('DEBUG', '0') in ('1', 'true', 'yes')
 
@@ -217,7 +217,7 @@ if ANALYTICS_ENABLED:
     DATABASE_ROUTERS = ['bublik.analytics.db_router.AnalyticsRouter']
 
 REDIS_PORT = os.getenv('REDIS_PORT', '6379')
-REDIS_HOST = os.getenv('REDIS_HOST', 'redis')
+REDIS_HOST = os.getenv('REDIS_HOST', '127.0.0.1')
 
 CACHES = {
     'default': {
@@ -329,7 +329,7 @@ if DEBUG:
         for k, _ in CACHES.items():
             CACHES[k]['BACKEND'] = 'django.core.cache.backends.dummy.DummyCache'
 
-RABBITMQ_HOST = os.getenv('RABBITMQ_HOST', 'rabbitmq')
+RABBITMQ_HOST = os.getenv('RABBITMQ_HOST', '127.0.0.1')
 RABBITMQ_PORT = os.getenv('RABBITMQ_PORT', '5672')
 
 CELERY_APP = os.getenv('CELERY_APP', 'bublik.interfaces')
