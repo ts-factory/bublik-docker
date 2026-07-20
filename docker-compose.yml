@@ -3,6 +3,7 @@ services:
     image: ${DOCKER_REGISTRY:-ghcr.io}/${DOCKER_ORG:-ts-factory}/${RUNNER_IMAGE_NAME:-bublik-runner}:${IMAGE_TAG:-latest}
     command: python manage.py run_mcp_server --host ${BUBLIK_DOCKER_MCP_HOST} --port ${BUBLIK_DOCKER_MCP_PORT}
     network_mode: host
+    env_file: .env
     environment:
       - BUBLIK_DOCKER_PROXY_PORT=${BUBLIK_DOCKER_PROXY_PORT}
       - PER_CONF_DIR=${PER_CONF_DIR}
@@ -30,6 +31,7 @@ services:
       - DB_PORT=${DB_PORT}
       - ANALYTICS_ENABLED=${ANALYTICS_ENABLED:-False}
       - ANALYTICS_DB_PATH=${ANALYTICS_DB_PATH:-/app/bublik/logs/analytics.sqlite3}
+      - CHAT_ENABLED=${CHAT_ENABLED:-False}
       - CELERY_APP=${CELERY_APP}
       - CELERY_RESULT_BACKEND=${CELERY_RESULT_BACKEND}
       - CELERY_ACCEPT_CONTENT=${CELERY_ACCEPT_CONTENT}
@@ -70,7 +72,8 @@ services:
     extra_hosts:
       - host.docker.internal:host-gateway
     command: >
-      gunicorn bublik.wsgi:application
+      gunicorn bublik.asgi:application
+      --worker-class uvicorn_worker.UvicornWorker
       --bind ${BUBLIK_DOCKER_DJANGO_HOST}:${BUBLIK_DOCKER_DJANGO_PORT}
       --limit-request-line 0
       --chdir ${BUBLIK_SRC}
@@ -81,6 +84,7 @@ services:
       --access-logfile ${BUBLIK_ACCESS_LOG}
       --log-level info
       --name "${BUBLIK_WEB_NAME}"
+    env_file: .env
     environment:
       - BUBLIK_DOCKER_PROXY_PORT=${BUBLIK_DOCKER_PROXY_PORT}
       - BUBLIK_DOCKER_PROXY_EXT_PORT=${BUBLIK_DOCKER_PROXY_EXT_PORT}
@@ -109,6 +113,7 @@ services:
       - DB_PORT=${DB_PORT}
       - ANALYTICS_ENABLED=${ANALYTICS_ENABLED:-False}
       - ANALYTICS_DB_PATH=${ANALYTICS_DB_PATH:-/app/bublik/logs/analytics.sqlite3}
+      - CHAT_ENABLED=${CHAT_ENABLED:-False}
       - CELERY_APP=${CELERY_APP}
       - CELERY_RESULT_BACKEND=${CELERY_RESULT_BACKEND}
       - CELERY_ACCEPT_CONTENT=${CELERY_ACCEPT_CONTENT}
@@ -131,11 +136,20 @@ services:
       - HOST_UID=${HOST_UID:-1000}
       - HOST_GID=${HOST_GID:-1000}
       - UMASK=${UMASK:-022}
+      - S3_ENDPOINT_URL=${S3_ENDPOINT_URL:-http://127.0.0.1:8333}
+      - S3_PUBLIC_ENDPOINT_URL=${S3_PUBLIC_ENDPOINT_URL:-}
+      - S3_ACCESS_KEY=${S3_ACCESS_KEY:-bublik}
+      - S3_SECRET_KEY=${S3_SECRET_KEY:-bublik-secret-key}
+      - S3_BUCKET=${S3_BUCKET:-bublik-chat-files}
+      - S3_REGION=${S3_REGION:-us-east-1}
+      - S3_PRESIGN_EXPIRY=${S3_PRESIGN_EXPIRY:-300}
+      - CHAT_FILE_MAX_SIZE=${CHAT_FILE_MAX_SIZE:-20971520}
     expose:
       - ${BUBLIK_DOCKER_DJANGO_PORT}
     entrypoint: ./entrypoint-django.sh
     depends_on:
       - redis
+      - seaweedfs
     volumes:
       - ${BUBLIK_DOCKER_DATA_DIR}/django-logs:/app/bublik/logs
       - static_data:/app/bublik/bublik/representation/static
@@ -160,6 +174,37 @@ services:
     ports:
       - ${REDIS_HOST}:${REDIS_PORT}:6379
 
+  seaweedfs:
+    image: chrislusf/seaweedfs:4.40
+    restart: unless-stopped
+    # Keep all SeaweedFS components on loopback; only its S3 API is used.
+    network_mode: host
+    command: >
+      mini
+      -dir=/data
+      -ip=127.0.0.1
+      -ip.bind=127.0.0.1
+      -s3.port=${BUBLIK_DOCKER_SEAWEEDFS_S3_PORT:-8333}
+      -s3.port.iceberg=0
+      -webdav=false
+      -admin.ui=false
+    environment:
+      - AWS_ACCESS_KEY_ID=${S3_ACCESS_KEY:-bublik}
+      - AWS_SECRET_ACCESS_KEY=${S3_SECRET_KEY:-bublik-secret-key}
+      - S3_BUCKET=${S3_BUCKET:-bublik-chat-files}
+    volumes:
+      - seaweedfs_data:/data
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "curl --fail http://127.0.0.1:${BUBLIK_DOCKER_SEAWEEDFS_S3_PORT:-8333}/status || exit 1",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
   rabbitmq:
     image: rabbitmq:4.2-management
     ports:
@@ -176,6 +221,7 @@ services:
     image: ${DOCKER_REGISTRY:-ghcr.io}/${DOCKER_ORG:-ts-factory}/${RUNNER_IMAGE_NAME:-bublik-runner}:${IMAGE_TAG:-latest}
     command: celery -A ${CELERY_APP} worker --max-tasks-per-child ${CELERYD_MAX_TASKS_PER_CHILD} --concurrency 1 --prefetch-multiplier 1 -l ${CELERY_LOG_LEVEL}
     restart: unless-stopped
+    env_file: .env
     environment:
       - BUBLIK_DOCKER_PROXY_PORT=${BUBLIK_DOCKER_PROXY_PORT}
       - BUBLIK_DOCKER_PROXY_EXT_PORT=${BUBLIK_DOCKER_PROXY_EXT_PORT}
@@ -199,6 +245,7 @@ services:
       - DB_PORT=${DB_PORT}
       - ANALYTICS_ENABLED=${ANALYTICS_ENABLED:-False}
       - ANALYTICS_DB_PATH=${ANALYTICS_DB_PATH:-/app/bublik/logs/analytics.sqlite3}
+      - CHAT_ENABLED=${CHAT_ENABLED:-False}
       - CELERY_APP=${CELERY_APP}
       - CELERY_RESULT_BACKEND=${CELERY_RESULT_BACKEND}
       - CELERY_ACCEPT_CONTENT=${CELERY_ACCEPT_CONTENT}
@@ -240,6 +287,7 @@ services:
     network_mode: host
     command: celery -A ${CELERY_APP} flower --persistent=${FLOWER_PERSISTENT} --url_prefix=${FLOWER_URL_PREFIX} --port=${FLOWER_PORT}
     restart: unless-stopped
+    env_file: .env
     environment:
       - BUBLIK_DOCKER_PROXY_PORT=${BUBLIK_DOCKER_PROXY_PORT}
       - BUBLIK_DOCKER_PROXY_EXT_PORT=${BUBLIK_DOCKER_PROXY_EXT_PORT}
@@ -263,6 +311,7 @@ services:
       - DB_PORT=${DB_PORT}
       - ANALYTICS_ENABLED=${ANALYTICS_ENABLED:-False}
       - ANALYTICS_DB_PATH=${ANALYTICS_DB_PATH:-/app/bublik/logs/analytics.sqlite3}
+      - CHAT_ENABLED=${CHAT_ENABLED:-False}
       - CELERY_APP=${CELERY_APP}
       - CELERY_RESULT_BACKEND=${CELERY_RESULT_BACKEND}
       - CELERY_ACCEPT_CONTENT=${CELERY_ACCEPT_CONTENT}
@@ -369,4 +418,5 @@ volumes:
   static_data:
   flower_data:
   redis_data:
+  seaweedfs_data:
   static_te_html:

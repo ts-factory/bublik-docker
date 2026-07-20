@@ -35,6 +35,11 @@ RUN apt-get update \
   libyaml-dev \
   libssl-dev \
   libglib2.0-dev \
+  libpango-1.0-0 \
+  libpangocairo-1.0-0 \
+  libgdk-pixbuf-2.0-0 \
+  fonts-dejavu-core \
+  fonts-liberation \
   git \
   && rm -rf /var/lib/apt/lists/* \
   && cpan -T JSON

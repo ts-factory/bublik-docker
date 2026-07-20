@@ -65,6 +65,7 @@ INSTALLED_APPS = [
 
 ANALYTICS_ENABLED = os.getenv('ANALYTICS_ENABLED', '0').lower() in ('1', 'true', 'yes')
 ANALYTICS_DB_PATH = os.getenv('ANALYTICS_DB_PATH', '/app/bublik/logs/analytics.sqlite3')
+CHAT_ENABLED = os.getenv('CHAT_ENABLED', '0').lower() in ('1', 'true', 'yes')
 
 if ANALYTICS_ENABLED:
     INSTALLED_APPS.append('bublik.analytics')
@@ -90,6 +91,11 @@ PREFIX = os.getenv('URL_PREFIX', '')
 BUBLIK_DOCKER_PROXY_PORT = os.getenv('BUBLIK_DOCKER_PROXY_PORT', '80')
 URL_PREFIX = f'{PREFIX}'[1:]
 
+_bublik_fqdn = os.getenv('BUBLIK_FQDN', '')
+if _bublik_fqdn and BUBLIK_DOCKER_PROXY_PORT not in ('80', '443'):
+    _bublik_fqdn = f'{_bublik_fqdn.rstrip("/")}:{BUBLIK_DOCKER_PROXY_PORT}'
+BUBLIK_FQDN = _bublik_fqdn
+
 ROOT_URLCONF = 'bublik.urls'
 
 TEMPLATES = [
@@ -111,6 +117,7 @@ TEMPLATES = [
 MANAGEMENT_COMMANDS_LOG = os.getenv('MANAGEMENT_COMMANDS_LOG')
 
 WSGI_APPLICATION = 'bublik.wsgi.application'
+ASGI_APPLICATION = 'bublik.asgi.application'
 DJANGO_LOG_LEVEL = os.getenv('DJANGO_LOG_LEVEL', 'INFO')
 CELERY_LOG_LEVEL = os.getenv('CELERYD_LOG_LEVEL', 'INFO')
 LOGGING = {
@@ -218,6 +225,7 @@ if ANALYTICS_ENABLED:
 
 REDIS_PORT = os.getenv('REDIS_PORT', '6379')
 REDIS_HOST = os.getenv('REDIS_HOST', '127.0.0.1')
+REDIS_URL = f'redis://{REDIS_HOST}:{REDIS_PORT}/0'
 
 CACHES = {
     'default': {
@@ -374,6 +382,20 @@ QUERY_DELIMITER = ';'
 KEY_VALUE_DELIMITER = '='
 PERIOD_DELIMITER = '-'
 TIMESTAMP_DELIMITER = 's'
+
+# S3-compatible storage for AI-chat generated files (bundled SeaweedFS by default)
+S3_ENDPOINT_URL = os.getenv('S3_ENDPOINT_URL', 'http://127.0.0.1:8333')
+# Set only when the S3 endpoint is browser-reachable (e.g. real AWS S3);
+# downloads are then redirected to presigned URLs instead of proxied.
+S3_PUBLIC_ENDPOINT_URL = os.getenv('S3_PUBLIC_ENDPOINT_URL', '')
+S3_ACCESS_KEY = os.getenv('S3_ACCESS_KEY', 'bublik')
+S3_SECRET_KEY = os.getenv('S3_SECRET_KEY', 'bublik-secret-key')
+S3_BUCKET = os.getenv('S3_BUCKET', 'bublik-chat-files')
+S3_REGION = os.getenv('S3_REGION', 'us-east-1')
+S3_PRESIGN_EXPIRY = int(os.getenv('S3_PRESIGN_EXPIRY', '300'))
+# Upload cap for agent-generated files; also bounds the memory used by the
+# chat file download endpoint, which reads whole objects.
+CHAT_FILE_MAX_SIZE = int(os.getenv('CHAT_FILE_MAX_SIZE', str(20 * 1024 * 1024)))
 
 # Email settings
 EMAIL_HOST = os.getenv('EMAIL_HOST', 'mailpit')
