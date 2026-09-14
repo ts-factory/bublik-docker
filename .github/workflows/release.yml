@@ -49,6 +49,24 @@ jobs:
           chmod +x scripts/setup_settings.sh
           ./scripts/setup_settings.sh
 
+      # The build context has no git: .dockerignore strips .git, and submodule .git
+      # files point into the superproject. Capture it on the runner instead.
+      # Checkout uses submodules: true + fetch-depth: 0, so submodules are detached
+      # at their pinned commits, which on a release are their own vX.Y.Z tags.
+      - name: Collect version info
+        run: |
+          chmod +x scripts/git_version_env.sh
+          eval "$(./scripts/git_version_env.sh ./bublik BUBLIK)"
+          eval "$(./scripts/git_version_env.sh ./bublik-ui BUBLIK_UI)"
+          for v in BUBLIK_REPO_URL BUBLIK_REPO_BRANCH BUBLIK_REPO_TAG \
+                   BUBLIK_COMMIT_REV BUBLIK_COMMIT_DATE BUBLIK_COMMIT_SUMMARY \
+                   BUBLIK_BUILD_DATE BUBLIK_UI_REPO_BRANCH BUBLIK_UI_REPO_TAG \
+                   BUBLIK_UI_COMMIT_REV BUBLIK_UI_COMMIT_DATE BUBLIK_UI_COMMIT_SUMMARY; do
+            printf '%s=%s\n' "$v" "${!v}" >> "$GITHUB_ENV"
+          done
+          echo "Backend: $BUBLIK_REPO_TAG ($BUBLIK_COMMIT_REV)"
+          echo "Frontend: $BUBLIK_UI_REPO_TAG ($BUBLIK_UI_COMMIT_REV)"
+
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
 
@@ -84,6 +102,13 @@ jobs:
           platforms: ${{ matrix.platform }}
           build-args: |
             URL_PREFIX=${{ env.URL_PREFIX }}
+            BUBLIK_REPO_URL=${{ env.BUBLIK_REPO_URL }}
+            BUBLIK_REPO_BRANCH=${{ env.BUBLIK_REPO_BRANCH }}
+            BUBLIK_REPO_TAG=${{ env.BUBLIK_REPO_TAG }}
+            BUBLIK_COMMIT_REV=${{ env.BUBLIK_COMMIT_REV }}
+            BUBLIK_COMMIT_DATE=${{ env.BUBLIK_COMMIT_DATE }}
+            BUBLIK_COMMIT_SUMMARY=${{ env.BUBLIK_COMMIT_SUMMARY }}
+            BUBLIK_BUILD_DATE=${{ env.BUBLIK_BUILD_DATE }}
           push: true
           labels: ${{ steps.meta.outputs.labels }}
           outputs: type=image,push-by-digest=true,name-canonical=true,push=true
@@ -113,6 +138,11 @@ jobs:
           build-args: |
             URL_PREFIX=${{ env.URL_PREFIX }}
             SOURCE_MAP=${{ env.SOURCE_MAP }}
+            BUBLIK_UI_REPO_BRANCH=${{ env.BUBLIK_UI_REPO_BRANCH }}
+            BUBLIK_UI_REPO_TAG=${{ env.BUBLIK_UI_REPO_TAG }}
+            BUBLIK_UI_COMMIT_REV=${{ env.BUBLIK_UI_COMMIT_REV }}
+            BUBLIK_UI_COMMIT_DATE=${{ env.BUBLIK_UI_COMMIT_DATE }}
+            BUBLIK_UI_COMMIT_SUMMARY=${{ env.BUBLIK_UI_COMMIT_SUMMARY }}
           push: true
           labels: ${{ steps.meta.outputs.labels }}
           outputs: type=image,push-by-digest=true,name-canonical=true,push=true

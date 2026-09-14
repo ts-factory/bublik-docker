@@ -111,6 +111,25 @@ RUN mkdir -p ./bublik/logs
 
 WORKDIR /app/bublik
 
+# Deploy/version info, captured on the host by scripts/git_version_env.sh and read by
+# REPO_REVISIONS in settings.py. The build context has no git (.dockerignore strips
+# .git, and submodule .git files point into the superproject), so it must be injected.
+# Kept last so a new commit only invalidates this trailing layer.
+ARG BUBLIK_REPO_URL=""
+ARG BUBLIK_REPO_BRANCH=""
+ARG BUBLIK_REPO_TAG=""
+ARG BUBLIK_COMMIT_REV=""
+ARG BUBLIK_COMMIT_DATE=""
+ARG BUBLIK_COMMIT_SUMMARY=""
+ARG BUBLIK_BUILD_DATE=""
+ENV BUBLIK_REPO_URL=${BUBLIK_REPO_URL} \
+    BUBLIK_REPO_BRANCH=${BUBLIK_REPO_BRANCH} \
+    BUBLIK_REPO_TAG=${BUBLIK_REPO_TAG} \
+    BUBLIK_COMMIT_REV=${BUBLIK_COMMIT_REV} \
+    BUBLIK_COMMIT_DATE=${BUBLIK_COMMIT_DATE} \
+    BUBLIK_COMMIT_SUMMARY=${BUBLIK_COMMIT_SUMMARY} \
+    BUBLIK_BUILD_DATE=${BUBLIK_BUILD_DATE}
+
 ###########################################
 #           Log Server                    #
 ###########################################

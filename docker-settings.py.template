@@ -386,15 +386,32 @@ EMAIL_FROM = os.getenv('EMAIL_FROM')
 EMAIL_ADMINS = [email.strip() for email in os.getenv('EMAIL_ADMINS', '').split(',') if email]
 
 # Repo revisions
+# Injected at image build time as ARG -> ENV (see scripts/git_version_env.sh and the
+# runner stage of the Dockerfile). This is the Docker-native equivalent of
+# check_repo_revisions() in bublik/scripts/deploy, which sed-patches this block on
+# bare-metal deploys. Settings are read once at process start, so adding any of these
+# names to a service's compose `environment:` block overrides the baked-in value
+# without a rebuild.
+
+
+def _revision(name, default='null'):
+    return os.getenv(name, '').strip() or default
+
+
+# commit_date must stay parseable: the UI validates it with zod's z.coerce.date(),
+# and an unparseable value fails the whole /server/version query (not just the date),
+# which is what used to render "API: Invalid date" in the sidebar.
+_commit_date = _revision('BUBLIK_COMMIT_DATE', '') or _revision('BUBLIK_BUILD_DATE', '')
+
 REPO_REVISIONS = {
-    'repo_url': 'null',
-    'repo_branch': 'null',
+    'repo_url': _revision('BUBLIK_REPO_URL'),
+    'repo_branch': _revision('BUBLIK_REPO_BRANCH'),
     'latest_commit': {
-        'commit_date': 'null',
-        'commit_rev': 'null',
-        'commit_summary': 'null',
+        'commit_date': _commit_date or 'null',
+        'commit_rev': _revision('BUBLIK_COMMIT_REV'),
+        'commit_summary': _revision('BUBLIK_COMMIT_SUMMARY'),
     },
-    'repo_tag': 'null',
+    'repo_tag': _revision('BUBLIK_REPO_TAG'),
 }
 
 
