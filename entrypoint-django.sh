@@ -6,9 +6,11 @@ setup_umask
 
 echo "Setting up required directories..."
 ANALYTICS_DB_DIR="$(dirname "${ANALYTICS_DB_PATH:-/app/bublik/analytics/analytics.sqlite3}")"
+AI_CHAT_FILES_DIR="${AI_CHAT_FILE_STORAGE_DIR:-/app/bublik/ai-chat-files}"
 ensure_directory "${BUBLIK_LOGDIR}"
 ensure_directory "/app/bublik/logs"
 ensure_directory "${ANALYTICS_DB_DIR}"
+ensure_directory "${AI_CHAT_FILES_DIR}"
 ensure_directory "${BUBLIK_DOCKER_DATA_DIR}/django-logs"
 ensure_directory "${BUBLIK_DOCKER_DATA_DIR}/te-logs/logs"
 ensure_directory "${BUBLIK_DOCKER_DATA_DIR}/te-logs/incoming"
@@ -49,5 +51,6 @@ else:
 EOF
 
 setup_runtime_permissions "${ANALYTICS_DB_DIR}"
+setup_private_directory "${AI_CHAT_FILES_DIR}"
 
 exec_as_user "$@" 

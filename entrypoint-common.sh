@@ -41,6 +41,21 @@ setup_runtime_permissions() {
     done
 }
 
+# Ownership only, no recursion: the directory is a mount point the app writes
+# into itself, and its contents carry deliberately restrictive modes.
+setup_private_directory() {
+    local uid=${HOST_UID:-1000}
+    local gid=${HOST_GID:-1000}
+
+    for dir in "$@"; do
+        if [ -d "$dir" ]; then
+            echo "Setting up private directory $dir"
+            chown "${uid}:${gid}" "$dir"
+            chmod 700 "$dir"
+        fi
+    done
+}
+
 exec_as_user() {
     if [ "$(id -u)" -eq 0 ]; then
         CONTAINER_UID=${HOST_UID:-1000}
