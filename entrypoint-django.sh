@@ -43,7 +43,6 @@ if not User.objects.filter(email=SUPERUSER_EMAIL).exists():
     User.objects.create_superuser(
         email=SUPERUSER_EMAIL,
         password=SUPERUSER_PASSWORD,
-        is_active=True
     )
     print(f'Superuser created with email: {SUPERUSER_EMAIL}')
 else:
