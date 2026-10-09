@@ -669,11 +669,17 @@ tasks:
       already has, so this is cheap to re-run. Bundles planned with +ui are left
       for the Playwright import project.
       Override the plan: task e2e:seed -- --day "2026-04-21:basic.ok=1"
-    env: *e2e-env
     vars:
       # Dedicated var, not CLI_ARGS directly, so a caller can blank it — the
       # special CLI_ARGS cannot be overridden.
       ARGS: '{{.ARGS | default .CLI_ARGS}}'
+    cmds:
+      - task: e2e:seed:runs
+        vars: {ARGS: '{{.ARGS}}'}
+
+  e2e:seed:runs:
+    internal: true
+    env: *e2e-env
     # Skip when the instance already has the plan's runs — but never skip an
     # explicit override, which is asking for something the manifest cannot know.
     status:
