@@ -20,7 +20,7 @@ Four commands cover the whole loop:
 | Command | Does |
 |---------|------|
 | `task e2e:up` | Build the images, start the E2E stack, and wait until the API, UI, logs and Celery all answer. |
-| `task e2e:seed` | Generate the fixture runs and import them, skipping any the instance already has. |
+| `task e2e:seed` | Generate the fixture runs and import them, then create the plan's classification issues and rules. On a seeded stack it skips the runs and only resumes the classification; it fails if `e2e/plan.yaml` changed since that seed (see below). Pass `E2E_CLASSIFY=0` to skip the classification. |
 | `task e2e:test` | Run the Playwright suite against it. |
 | `task e2e:down` | Stop the stack, keeping its database and fixtures so the next `up` starts with the same data. |
 
@@ -28,7 +28,7 @@ A typical session:
 
 ```bash
 task e2e:up
-task e2e:seed    # first run seeds; later runs are a no-op if the data is there
+task e2e:seed    # first run seeds; later runs are a no-op while the plan is unchanged
 task e2e:test
 task e2e:down
 ```
@@ -47,6 +47,10 @@ To throw everything away rather than just stopping:
 docker compose -f docker-compose.yml -f docker-compose.db.yml down --volumes
 python3 scripts/e2e.py clean    # fixtures, manifest, reports, traces, auth state
 ```
+
+Do this after editing `e2e/plan.yaml` on a seeded stack too. A seeded stack is
+never regenerated in place, so `task e2e:seed` refuses to go on with a plan that
+changed since the seed and prints these commands with the environment filled in.
 
 Both need the E2E environment — `COMPOSE_PROJECT_NAME=bublik-e2e` and
 `BUBLIK_DOCKER_DATA_DIR=./data/e2e` — or they will act on the production stack.
