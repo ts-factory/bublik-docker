@@ -732,9 +732,12 @@ tasks:
     desc: Create the plan's classification issues and rules on a seeded stack
     summary: |
       Apply the plan's `classification:` section to an already-seeded stack:
-      create its issues, classify one result per rule, and close the issues that
-      ask for it. Idempotent — a rule that already carries an id is left alone,
-      so this is safe to re-run.
+      create its issues, classify one result per rule, close the issues that
+      ask for it, then re-apply the active rules to every seeded run that
+      carries pins (the API's apply_rules), so an issue's results span runs and
+      days rather than the one classified result. Idempotent — a rule that
+      already carries an id is left alone, and a run already applied to is
+      skipped, so this is safe to re-run.
 
       Ordering is the point. The rules are written against runs already in the
       instance; the bundles planned with +ui are imported afterwards by the

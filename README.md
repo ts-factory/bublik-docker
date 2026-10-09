@@ -61,7 +61,7 @@ The default campaign is versioned in `e2e/plan.yaml`. Validate it and see what
 it expands to — without generating anything — with:
 
 ```bash
-bublik-e2e plan --plan e2e/plan.yaml            # 39 runs, 5 dates with runs, 1 empty, ...
+bublik-e2e plan --plan e2e/plan.yaml            # 45 runs, 5 dates with runs, 1 empty, ...
 bublik-e2e plan --plan e2e/plan.yaml --by conclusion  # or --by fixture
 ```
 
