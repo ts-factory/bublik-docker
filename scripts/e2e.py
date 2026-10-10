@@ -13,10 +13,16 @@ specific to this repository's layout:
 ``seeded``                 exit 0 when the running stack already has the
                            manifest's runs, so ``task e2e:seed`` can skip
                            reseeding
+``record-plan``            remember which plan (or ``--override``) the stack
+                           was seeded from, next to the manifest
+``check-plan``             fail when the stack is seeded but the plan changed
+                           since, printing the commands that reset it
 """
 
+import hashlib
 import json
 import os
+import shlex
 import shutil
 import sys
 import urllib.error
@@ -121,6 +127,7 @@ def clean_artifacts() -> None:
     publish_dir, manifest = _artifact_paths()
     _remove_directory(publish_dir)
     manifest.unlink(missing_ok=True)
+    plan_stamp(manifest).unlink(missing_ok=True)
     for relative in PLAYWRIGHT_ARTIFACTS:
         _remove_directory(_resolve_allowed(relative, ROOT.resolve(), "test output"))
 
@@ -180,6 +187,97 @@ def is_seeded() -> bool:
     return _run_exists(f"{base_url}/api/v2/runs/{run_ids[0]}/")
 
 
+# What a stack seeded from a --day/--runs override records instead of a digest:
+# its manifest matches no plan file.
+OVERRIDE_STAMP = "override"
+
+
+def plan_stamp(manifest: Path) -> Path:
+    """Where the digest of the plan a stack was seeded from is kept."""
+    return manifest.with_name(manifest.name + ".plan-sha256")
+
+
+def _plan_digest(plan: Path) -> str:
+    try:
+        return hashlib.sha256(plan.read_bytes()).hexdigest()
+    except OSError as error:
+        raise E2EError(f"cannot read plan {plan}: {error}") from error
+
+
+def _manifest_path() -> Path:
+    return Path(_required_environment("BUBLIK_E2E_MANIFEST")).expanduser()
+
+
+def record_plan(plan: Path | None) -> None:
+    """Record ``plan``'s digest next to the manifest; ``None`` for an override."""
+    stamp = plan_stamp(_manifest_path())
+    stamp.parent.mkdir(parents=True, exist_ok=True)
+    stamp.write_text(
+        OVERRIDE_STAMP if plan is None else _plan_digest(plan), encoding="utf-8"
+    )
+
+
+def _reset_commands() -> str:
+    def assign(*names: str) -> str:
+        return " ".join(
+            f"{name}={shlex.quote(os.environ.get(name, ''))}" for name in names
+        )
+
+    compose_files = os.environ.get("COMPOSE_FILES", "").strip() or (
+        "-f docker-compose.yml -f docker-compose.db.yml"
+    )
+    return "\n".join(
+        [
+            f"  {assign('COMPOSE_PROJECT_NAME')} docker compose {compose_files} "
+            "down --volumes",
+            "  "
+            + assign(
+                "BUBLIK_DOCKER_DATA_DIR",
+                "BUBLIK_E2E_PUBLISH_DIR",
+                "BUBLIK_E2E_MANIFEST",
+            )
+            + " python3 scripts/e2e.py clean",
+            "  task e2e:up && task e2e:seed",
+        ]
+    )
+
+
+def check_plan(plan: Path) -> str | None:
+    """Fail when the seeded stack no longer matches ``plan``.
+
+    A seeded stack skips the runs step, so an edited plan never reaches the
+    manifest or the instance; regenerating over a populated stack is not an
+    option either. The only way forward is a reset, so say exactly how.
+    Returns a warning when the stack predates recording the plan.
+    """
+    if not is_seeded():
+        return None
+    stamp = plan_stamp(_manifest_path())
+    if not stamp.is_file():
+        return (
+            f"cannot tell whether {plan} changed since this stack was seeded: "
+            "it predates recording the plan. If it did, reset the stack:\n"
+            + _reset_commands()
+        )
+    recorded = stamp.read_text(encoding="utf-8").strip()
+    if recorded == _plan_digest(plan):
+        return None
+    if recorded == OVERRIDE_STAMP:
+        reason = (
+            f"this stack was seeded from a --day/--runs override, not {plan}, "
+            "so its runs and classification do not match the plan"
+        )
+    else:
+        reason = (
+            f"{plan} changed since this stack was seeded, so its runs, "
+            "issues and trackers no longer match the plan"
+        )
+    raise E2EError(
+        f"{reason}. A seeded stack is never regenerated in place; reset it and "
+        "seed again:\n" + _reset_commands()
+    )
+
+
 def main() -> int:
     try:
         command = sys.argv[1] if len(sys.argv) > 1 else ""
@@ -191,7 +289,19 @@ def main() -> int:
             return 0
         if command == "seeded":
             return 0 if is_seeded() else 1
-        raise E2EError("usage: e2e.py clean | guard-compose-project | seeded")
+        if command == "record-plan" and len(sys.argv) == 3:
+            argument = sys.argv[2]
+            record_plan(None if argument == "--override" else Path(argument))
+            return 0
+        if command == "check-plan" and len(sys.argv) == 3:
+            warning = check_plan(Path(sys.argv[2]))
+            if warning:
+                print(f"e2e: warning: {warning}", file=sys.stderr)
+            return 0
+        raise E2EError(
+            "usage: e2e.py clean | guard-compose-project | seeded"
+            " | record-plan <plan>|--override | check-plan <plan>"
+        )
     except E2EError as error:
         print(f"e2e: {error}", file=sys.stderr)
         return 2
