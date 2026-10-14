@@ -1,5 +1,8 @@
+import contextlib
+import io
 import json
 import os
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -42,6 +45,7 @@ class CleanupSafetyTests(unittest.TestCase):
         publish_dir.mkdir()
         (publish_dir / "bundle.tar").write_text("fixture", encoding="utf-8")
         manifest.write_text("{}", encoding="utf-8")
+        e2e.plan_stamp(manifest).write_text("0" * 64, encoding="utf-8")
         sibling.write_text("keep", encoding="utf-8")
 
         self.clean()
@@ -49,6 +53,7 @@ class CleanupSafetyTests(unittest.TestCase):
         self.assertFalse(publish_dir.exists())
         self.assertFalse(manifest.exists())
         self.assertEqual(sibling.read_text(encoding="utf-8"), "keep")
+        self.assertFalse(e2e.plan_stamp(manifest).exists())
 
     def test_removes_playwright_reports_and_auth_state(self) -> None:
         reports = self.root / "bublik-ui" / "dist" / ".playwright" / "apps" / "bublik"
@@ -194,6 +199,89 @@ class SeededProbeTests(unittest.TestCase):
         response.__exit__ = Mock(return_value=False)
         with patch.object(e2e.urllib.request, "urlopen", return_value=response):
             self.assertTrue(e2e._run_exists("http://127.0.0.1/api/v2/runs/1/"))
+
+
+class PlanDriftTests(unittest.TestCase):
+    """A seeded stack must fail loudly once e2e/plan.yaml no longer matches it."""
+
+    def setUp(self) -> None:
+        self.temporary = tempfile.TemporaryDirectory()
+        directory = Path(self.temporary.name)
+        self.manifest = directory / "manifest.json"
+        self.plan = directory / "plan.yaml"
+        self.plan.write_text("version: 1\n", encoding="utf-8")
+        self.manifest.write_text(
+            json.dumps({"bundles": [{"id": "a", "runId": 1}]}), encoding="utf-8"
+        )
+        self.environment = {
+            "BUBLIK_E2E_MANIFEST": str(self.manifest),
+            "BUBLIK_E2E_URL": "http://127.0.0.1:42000",
+            "COMPOSE_PROJECT_NAME": "bublik-e2e",
+            "COMPOSE_FILES": "-f docker-compose.yml -f docker-compose.db.yml",
+            "BUBLIK_DOCKER_DATA_DIR": "data/e2e",
+            "BUBLIK_E2E_PUBLISH_DIR": "data/e2e/logs/logs/e2e",
+        }
+
+    def tearDown(self) -> None:
+        self.temporary.cleanup()
+
+    def run_command(self, *args: str, seeded: bool = True) -> tuple[int, str]:
+        stderr = io.StringIO()
+        with (
+            patch.dict(os.environ, self.environment, clear=True),
+            patch.object(e2e, "_run_exists", return_value=seeded),
+            patch.object(sys, "argv", ["e2e.py", *args]),
+            contextlib.redirect_stderr(stderr),
+        ):
+            code = e2e.main()
+        return code, stderr.getvalue()
+
+    def test_an_unchanged_plan_passes(self) -> None:
+        self.assertEqual(self.run_command("record-plan", str(self.plan))[0], 0)
+
+        self.assertEqual(self.run_command("check-plan", str(self.plan)), (0, ""))
+
+    def test_an_edited_plan_fails_with_the_reset_commands(self) -> None:
+        self.run_command("record-plan", str(self.plan))
+        self.plan.write_text("version: 1\nruns: 2\n", encoding="utf-8")
+
+        code, message = self.run_command("check-plan", str(self.plan))
+
+        self.assertEqual(code, 2)
+        self.assertIn(f"{self.plan} changed since this stack was seeded", message)
+        self.assertIn(
+            "COMPOSE_PROJECT_NAME=bublik-e2e docker compose "
+            "-f docker-compose.yml -f docker-compose.db.yml down --volumes",
+            message,
+        )
+        self.assertIn(
+            "BUBLIK_DOCKER_DATA_DIR=data/e2e "
+            "BUBLIK_E2E_PUBLISH_DIR=data/e2e/logs/logs/e2e "
+            f"BUBLIK_E2E_MANIFEST={self.manifest} python3 scripts/e2e.py clean",
+            message,
+        )
+        self.assertIn("task e2e:up && task e2e:seed", message)
+
+    def test_a_stack_seeded_from_an_override_counts_as_drift(self) -> None:
+        self.run_command("record-plan", "--override")
+
+        code, message = self.run_command("check-plan", str(self.plan))
+
+        self.assertEqual(code, 2)
+        self.assertIn("seeded from a --day/--runs override", message)
+
+    def test_an_unseeded_stack_has_nothing_to_drift_from(self) -> None:
+        self.run_command("record-plan", str(self.plan))
+        self.plan.write_text("version: 1\nruns: 2\n", encoding="utf-8")
+
+        self.assertEqual(self.run_command("check-plan", str(self.plan), seeded=False), (0, ""))
+
+    def test_a_stack_seeded_before_plans_were_recorded_only_warns(self) -> None:
+        code, message = self.run_command("check-plan", str(self.plan))
+
+        self.assertEqual(code, 0)
+        self.assertIn("cannot tell whether", message)
+        self.assertIn("down --volumes", message)
 
 
 class ComposeGuardTests(unittest.TestCase):
