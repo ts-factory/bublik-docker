@@ -245,7 +245,7 @@ services:
     expose:
       - ${RABBITMQ_PORT}
     ports:
-      - ${RABBITMQ_PORT}:5672
+      - ${RABBITMQ_HOST}:${RABBITMQ_PORT}:5672
       - 15672:15672
 
   celery:
